@@ -22,7 +22,7 @@ naming_pattern_explained="<branch_type>/<optional-issue-number>/<branch-name>"
 naming_pattern_example="feature/0001/horizon-feature"
 
 # Errors Messages
-error_message="You can not push a branch out of compliance with our naming convention."
+error_message="You can not push a branch out of compliance with the naming convention."
 error_message_detail="local_branch: \t\t${cyan}${local_branch}${NC} does not match\n \
   naming_pattern: \t${purple}${naming_pattern}${NC}\n \
   pattern: \t\t${naming_pattern_explained}\n \
