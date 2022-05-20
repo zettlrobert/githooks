@@ -2,55 +2,52 @@
 # set english only environment that specifies the NSI C locale
 LC_ALL=C
 
-# OUTPUT-COLORING
-red='\e[0;31m'
-green='\e[0;32m'
-lightblue='\e[1;34m'
-purple='\e[0;35m'
-cyan='\e[0;36m'
-lightgreen='\e[1;32m'
-NC='\033[0m'
+# set DIR - contains the potentially relative path of the containing script in all invocation scenarios
+DIR="${BASH_SOURCE%/*}"
 
-# Variables
-emptyline=" \n \n"
+# if the relative path is not available on BASH_SOURCE infer full path name from pwd
+if [[ ! -d ${DIR} ]]; then DIR="PWD"; fi
+
+# import utils from scripts
+. "${DIR}/../scripts/utils.sh"
+
+# variables
 remote="$1"
 url="$2"
 local_branch="$(git rev-parse --abbrev-ref HEAD)"
 
-# Pattern Messages
+# pattern Messages
 naming_pattern="feature|bugfix|hotfix|junk|wip|chore|doc|devops/optional-4-digit-number/some-branch-name"
 naming_pattern_explained="<branch_type>/<optional-issue-number>/<branch-name>"
 naming_pattern_example="feature/0001/horizon-feature"
 
 # Errors Messages
 error_message="You can not push a branch out of compliance with our naming convention."
-error_message_detail="local_branch: \t\t${cyan}$local_branch${NC} does not match\n \
-  naming_pattern: \t${purple}$naming_pattern${NC}\n \
-  pattern: \t\t$naming_pattern_explained\n \
-  example: \t\t${lightgreen}$naming_pattern_example${NC}\n\n\n \
+error_message_detail="local_branch: \t\t${cyan}${local_branch}${NC} does not match\n \
+  naming_pattern: \t${purple}${naming_pattern}${NC}\n \
+  pattern: \t\t${naming_pattern_explained}\n \
+  example: \t\t${lightgreen}${naming_pattern_example}${NC}\n\n\n \
   Rename current local branch with:\n \
-  git branch -m $naming_pattern
+  git branch -m ${naming_pattern}
   "
 
-# Success Messages
+# success Messages
 success_message="Great you are in compliance with our naming convention!"
-success_message_detail="local branch: ${cyan}$local_branch${NC} \
-  pushed to remote: ${lightblue}$remote${NC} \
-  at url: ${lightblue}$url${NC}"
+success_message_detail="local branch: ${cyan}${local_branch}${NC} \
+  pushed to remote: ${lightblue}${remote}${NC} \
+  at url: ${lightblue}${url}${NC}"
 
-# Regular Expression to match against branch
-valid_branch_regex="^(feature|bugfix|hotfix|junk|wip|chore|doc|devops)\/[0-9]{4}\/[a-z-]*$"
+# regular Expression to match against branch
+# valid_branch_regex="^(feature|bugfix|hotfix|junk|wip|chore|doc|devops)\/[0-9]{4}\/[a-z-]*$"
 valid_branch_regex_number_optinal="^(feature|bugfix|hotfix|junk|wip|chore|doc)\/([0-9]{4}\/)?[a-z-]*$"
 
-# TODO: If master + develelop + staging prevent direct push
-
 # =~ checks "string" against pattern
-if [[ $local_branch =~ $valid_branch_regex_number_optinal ]];then
-  echo -e "\n \n${green}SUCCESS:${NC}"
-  echo -e "$success_message_detail \n \n \n \n"
+if [[ ${local_branch} =~ ${valid_branch_regex_number_optinal} ]]; then
+  echo -e "\n \n${green}SUCCESS:${NC}\t${success_message}"
+  echo -e "${success_message_detail} \n \n \n \n"
   exit 0
 else
-  echo -e "\n \n${red}FAIL: $error_message${NC}"
-  echo -e "$error_message_detail \n \n \n \n"
+  echo -e "\n \n${red}FAIL:${NC}\t${error_message}"
+  echo -e "${error_message_detail} \n \n \n \n"
   exit 1
 fi
