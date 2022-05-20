@@ -1,0 +1,106 @@
+#!/bin/bash
+# set DIR - contains the potentially relative path of the containing script in all invocation scenarios
+DIR="${BASH_SOURCE%/*}"
+
+# if the relative path is not available on BASH_SOURCE infer full path name from pwd
+if [[ ! -d ${DIR} ]]; then DIR="PWD"; fi
+
+# Import utils from scripts
+. "${DIR}/../scripts/utils.sh"
+
+####################################################################################################
+# configuration Variables
+max_length=120
+valid_commit_types=(
+  "feat"
+  "fix"
+  "build"
+  "chore"
+  "ci"
+  "docs"
+  "style"
+  "refactor"
+  "perf"
+  "test"
+)
+regex_commit_title="^[a-z+0-9\ \-\.\,]+\$"
+
+# this hook takes one argument by default the path to the COMMIT_EDITMSG
+commit_editmsg="$1"
+
+# variables to use in checks
+commit_message=$(head -n 1 "${commit_editmsg}")
+commit_message_length=${#commit_message}
+commit_type=$(echo "${commit_message}" | awk -F'[(!:]' '{print $1}')
+commit_title=$(echo "${commit_message}" | awk -F'[:]' '{print $2}')
+
+####################################################################################################
+list_allowed_commit_types="feat|fix|build|chore|ci|docs|style|refactor|perf|test"
+ok="${green}\t OK \t${NC}"
+fail="${red}\t FAIL \t${NC}"
+
+# error Messages
+error_commit_max_length="Check Length: ${fail} commit message exceeds ${max_length}\n\n\n"
+error_commit_type="Commit Type: ${fail} commit type must be ${list_allowed_commit_types}"
+error_commit_title_length="Commit Title: ${fail} commit title can not be empty"
+error_commit_title_case="Commit Title: ${fail} commit title must be all lower case and not contain any special characters"
+
+####################################################################################################
+# success Messages
+success_commit_length="Check Length: ${ok} commit message length: ${commit_message_length}"
+success_commit_type="Commit Type: ${ok} commit with type: ${commit_type}"
+success_commit_title="Commit Title: ${ok} commit valid title"
+success_commit="\n \nAdd Commit: \t ${cyan}${commit_message}${NC}\n\n\n"
+
+####################################################################################################
+# check if commit title exceeds the maximal configured length
+if [[ ${commit_message_length} -gt ${max_length} ]]; then
+  echo -e "${error_commit_max_length}"
+  exit 1
+else
+  echo -e "${success_commit_length}"
+fi
+
+####################################################################################################
+# check if commit type does match
+# loop
+is_valid_commit_type=false
+for valid_type in "${valid_commit_types[@]}"; do
+  if [[ ${commit_type} == "${valid_type}" ]]; then
+    is_valid_commit_type=true
+  fi
+done
+
+if [[ ${is_valid_commit_type} == true ]]; then
+  echo -e "${success_commit_type}"
+else
+  echo -e "${error_commit_type}"
+  exit 1
+fi
+
+####################################################################################################
+# check Commit Title
+is_valid_commit_title=true
+commit_title_error_message=''
+
+# commit Title not allowed to be empty
+if [[ ${#commit_title} -lt 5 ]]; then
+  commit_title_error_message="${error_commit_title_length}"
+  is_valid_commit_title=false
+fi
+
+# commit title must be in lower case not contain any special characters
+if [[ ! ${commit_title} =~ ${regex_commit_title} ]]; then
+  commit_title_error_message="${error_commit_title_case}"
+  is_valid_commit_title=false
+fi
+
+# check if commit title is invalid
+if [[ ${is_valid_commit_title} == true ]]; then
+  echo -e "${success_commit_title}"
+else
+  echo -e "${commit_title_error_message}"
+  exit 1
+fi
+
+echo -e "${success_commit}"
