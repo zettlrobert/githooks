@@ -37,6 +37,7 @@ flake.nix                        # packages.<system>.default (symlinkJoin + post
 lefthook.yml                     # shared base: hooks, jobs, globs, rc, assert_lefthook_installed, fail_on_changes: ci
 jobs/biome.yml                   # opt-in job file: a repo adds it to its extends list
 bin/githooks-install.in          # link .githooks as a GC root, lefthook install; skips in CI; @out@ substituted
+bin/githooks-coverage            # advisory: tracked file types vs base and opt-in jobs, names the tool for uncovered ones
 hooks/commit-msg.sh              # conventions, see below (done)
 hooks/pre-push.sh                # branch pattern, junk/stash guard (done)
 configs/.markdownlint-cli2.yaml  # line length 120, tables and code blocks exempt
@@ -71,7 +72,7 @@ markdownlint-cli2, taplo, hadolint, actionlint, biome, gitleaks. No git, no core
    Repo-specific jobs go under it and merge with the base. Opt-out of a base job: same job name with `skip: true`.
    Opt-in to biome: `extends: [".githooks/share/githooks/lefthook.yml", ".githooks/share/githooks/jobs/biome.yml"]`.
 3. `.gitignore`: `.githooks`, `lefthook-local.yml`.
-4. `justfile`: `lint` recipe = `lefthook run pre-commit --all-files --no-stage-fixed && gitleaks dir . -c .githooks/share/githooks/gitleaks.toml`.
+4. `justfile`: `lint` recipe = `lefthook run pre-commit --all-files --no-stage-fixed && gitleaks dir . -c .githooks/share/githooks/gitleaks.toml && githooks-coverage --summary`.
 5. CI: `nix develop --command just lint && git diff --exit-code HEAD` as a step after the existing checks.
 6. Without a flake (JavaScript repos with only `package.json`): `nix profile add github:zettlrobert/githooks`,
    then `githooks-install` in the repo; same `lefthook.yml` and `.gitignore` lines.
@@ -102,6 +103,17 @@ missing runner fails loudly instead of letting the commit through (verified: wit
 
 Not in hooks: vale (style sync needs network), trufflehog, tests, `docker compose config` (repo-specific job in
 homelab, needs the docker CLI from that repo's shell).
+
+## Coverage report (`githooks-coverage`)
+
+Lefthook ignores files that match no glob, so nothing says when a repo gains a file type without a job.
+`githooks-coverage` lists the tracked extensions (`git ls-files`) with counts and marks each one: covered by
+a base job, covered by an opt-in file (`jobs/biome.yml`), or uncovered. For uncovered types it names the
+standard tool when the script knows one (go: golangci-lint, rust: rustfmt and clippy, css/html: biome,
+terraform: tofu fmt, dockerfile already covered). Always exits 0; `--summary` prints one line, which `just lint`
+shows at the end. It is a report for the developer and the maintenance signal for this package: a type that
+keeps showing up uncovered across repos gets a job and a config here. About 40 lines of sh; the known-types
+table lives in the script, the base config stays the only list of what runs.
 
 ## Conventions (the two scripts)
 
