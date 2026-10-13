@@ -21,7 +21,9 @@ network at hook time. Tool versions pinned through nix, not through a second ver
 | `symlinkJoin` plus `postBuild` for the package | `buildEnv`, `substituteAll` | `$out` is in scope in `postBuild`, so the rc file and the base config get the real store path; `substituteAll` is deprecated. No `git` or `coreutils` in the package: hooks run from a git process that already has them, and `bin/git` would collide with nix-profiles core. Closure about 350 MiB, dominated by node (markdownlint-cli2) and python (yamllint, actionlint). |
 | Consumers set `inputs.githooks.inputs.nixpkgs.follows = "nixpkgs"` | this flake's own nixpkgs pin everywhere | One toolchain closure and one nixpkgs source per repo (CI's persisted store would otherwise carry a second ~400 MiB closure). A consumer's nixpkgs bump can change formatter output; the PR check shows it. This flake keeps its own pin for `nix flake check`. |
 | `bin/githooks-install` in the package, called by the shell hook | shell hook logic inline in nix | One script, with the store path baked in, serves flake repos (shell hook calls it) and repos without a flake (`nix profile add github:zettlrobert/githooks && githooks-install`). `extends: ~/.nix-profile/...` does not work: lefthook expands neither `~` nor env variables. |
-| One tool set for all languages, jobs filtered by `glob` | per-language sub-packages chosen per repo | A job whose glob matches no staged file is skipped, so a repo never declares which linters it needs. Cost is disk, once, in the store. Repos opt out of a job by name (JavaScript repos with their own eslint and prettier). |
+| One tool set for all languages, jobs filtered by `glob` | per-language sub-packages chosen per repo | A job whose glob matches no staged file is skipped, so a repo never declares which linters it needs. Cost is disk, once, in the store. Repos can still disable a base job by name with `skip: true`. |
+| Biome is opt-in: shipped as `jobs/biome.yml`, not in the base | biome in the base with a per-repo opt-out | The idiomatic choice for JavaScript repos is the toolchain the repo already declares (eslint, prettier). A repo that wants biome adds the file to its `extends` list. The binary stays in the package. |
+| Keep `junk` and `stash` as distinct temporary types | one `wip` type | Same enforcement (pre-push keeps both off `main`), different intent: `junk` is dirty work on a branch to be squashed or rebased away before merge; `stash` is a WIP snapshot committed instead of `git stash`, so it survives branch switches and can be pushed to a backup branch. Git's own stash never runs the commit-msg hook, so the two never collide. `wip` stays a branch prefix only. |
 | markdownlint-cli2 | rumdl | The standard tool and config format; rumdl is faster but at 0.2.x. Swap later if commit time suffers. |
 | nixfmt (RFC 166) | alejandra, nixpkgs-fmt | The formatter nixpkgs enforces. nixpkgs-fmt is archived. |
 | gitleaks in the hook, nothing else for secrets | trufflehog | MIT, static, offline; trufflehog verifies secrets over the network and is AGPL. |
@@ -33,6 +35,7 @@ network at hook time. Tool versions pinned through nix, not through a second ver
 ```
 flake.nix                        # packages.<system>.default (symlinkJoin + postBuild), passthru.shellHook, checks
 lefthook.yml                     # shared base: hooks, jobs, globs, rc, assert_lefthook_installed, fail_on_changes: ci
+jobs/biome.yml                   # opt-in job file: a repo adds it to its extends list
 bin/githooks-install.in          # link .githooks as a GC root, lefthook install; skips in CI; @out@ substituted
 hooks/commit-msg.sh              # conventions, see below (done)
 hooks/pre-push.sh                # branch pattern, junk/stash guard (done)
@@ -44,7 +47,7 @@ configs/biome.json               # format + recommended lint
 configs/taplo.toml
 tests/run.sh, tests/commit-msg/  # fixture tests for the two scripts (49 checks, done); extends/merge lab proven
 docs/design.md                   # this file
-README.md                        # manual usage guide: adopt a repo, run by hand, bump, troubleshoot
+README.md                        # the project README, see outline below
 ```
 
 Installed as `$out/bin/*` (lefthook, every linter, `githooks-install`) and `$out/share/githooks/` (configs,
@@ -66,6 +69,7 @@ markdownlint-cli2, taplo, hadolint, actionlint, biome, gitleaks. No git, no core
    extends: [".githooks/share/githooks/lefthook.yml"]
    ```
    Repo-specific jobs go under it and merge with the base. Opt-out of a base job: same job name with `skip: true`.
+   Opt-in to biome: `extends: [".githooks/share/githooks/lefthook.yml", ".githooks/share/githooks/jobs/biome.yml"]`.
 3. `.gitignore`: `.githooks`, `lefthook-local.yml`.
 4. `justfile`: `lint` recipe = `lefthook run pre-commit --all-files --no-stage-fixed && gitleaks dir . -c .githooks/share/githooks/gitleaks.toml`.
 5. CI: `nix develop --command just lint && git diff --exit-code HEAD` as a step after the existing checks.
@@ -89,7 +93,7 @@ pre-commit, `parallel: true`, `{staged_files}` filtered by glob, formatters with
 | `*.toml` | `taplo fmt`, `taplo check` | fix, check |
 | `Dockerfile*`, `*.Dockerfile` | `hadolint` | check |
 | `.forgejo/workflows/*.y*ml`, `.github/workflows/*.y*ml` | `actionlint -config-file <config>` | check |
-| `*.{js,mjs,cjs,ts,tsx,json,jsonc}` | `biome check --write --config-path <config>` | fix, check; `skip: true` in repos with eslint/prettier |
+| `*.{js,mjs,cjs,ts,tsx,json,jsonc}` | `biome check --write --config-path <config>` | fix, check; opt-in via `jobs/biome.yml`, not in the base |
 | all staged | `gitleaks git --pre-commit --staged --no-banner -c <config>` | check |
 
 commit-msg: `hooks/commit-msg.sh`. pre-push: `hooks/pre-push.sh`. `assert_lefthook_installed: true` so a
@@ -128,6 +132,17 @@ pre-push:
   `stash`; for a new or unfetched remote branch the range is `<local sha> --not --remotes=<remote>`.
 
 Both scripts print the rule that failed and an example of a valid value.
+
+## README outline
+
+The README is the manual usage guide and the front page. Sections, in this order: what it is and why (three
+sentences, no history); install in a flake repo and in a repo without a flake (the exact lines, copy-paste
+ready); what runs on commit (the job table above, with fix/check), what `just lint` and CI run; the
+conventions with one valid and one invalid example each, and the meaning of `junk` and `stash`; opt-in
+biome and per-repo jobs; bump the tools and rules; troubleshooting (hook not running, `Can't find lefthook`,
+`.githooks` dangling, stubs stale after a bump, GUI git); development (`just test`, `nix flake check`, layout);
+link to `docs/design.md`. Moving the source to the Forgejo instance later is one documented line
+(`git+https://forgejo.<domain>/zettlrobert/githooks?ref=main`).
 
 ## Verification
 
