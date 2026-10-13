@@ -1,0 +1,7 @@
+# gitleaks: default rules plus the homelab placeholder conventions, so documented secrets never trip it.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "placeholders and pass references, not secrets"
+regexes = ['''REPLACE_ON_BOX[A-Z_]*''', '''\{\{HOMEPAGE_VAR_[A-Z_]+\}\}''', '''pass (show )?homelab/[a-z0-9/_-]+''']

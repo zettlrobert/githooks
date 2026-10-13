@@ -1,0 +1,3 @@
+# hadolint rules shared by every repo.
+ignored:
+  - DL3008   # pin apt versions: impractical on Debian base images, Renovate tracks the base tag instead

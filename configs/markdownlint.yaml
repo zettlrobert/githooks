@@ -1,0 +1,10 @@
+# markdownlint-cli2 rules shared by every repo (jobs pass --config, so the file name is free).
+config:
+  default: true
+  MD013:                 # line length
+    line_length: 120
+    tables: false
+    code_blocks: false
+  MD033: false           # inline HTML is fine in docs
+  MD041: false           # first line need not be a top-level heading (frontmatter, badges)
+  MD060: false           # table column padding style: compact |---|---| tables are the house style

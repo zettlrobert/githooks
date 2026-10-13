@@ -1,0 +1,4 @@
+# actionlint: labels of the self-hosted Forgejo runner, else `runs-on: docker` is "unknown label".
+self-hosted-runner:
+  labels:
+    - docker

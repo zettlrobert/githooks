@@ -1,0 +1,8 @@
+# Opt-in: a repo without its own JavaScript toolchain adds this file to its extends list:
+#   extends: [".githooks/share/githooks/lefthook.yml", ".githooks/share/githooks/jobs/biome.yml"]
+pre-commit:
+  jobs:
+    - name: biome
+      glob: "*.{js,mjs,cjs,ts,tsx,json,jsonc}"
+      run: biome check --write --config-path .githooks/share/githooks/biome.json {staged_files}
+      stage_fixed: true

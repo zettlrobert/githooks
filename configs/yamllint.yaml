@@ -1,0 +1,8 @@
+# yamllint rules shared by every repo. Relaxed base, long comment lines allowed up to 120.
+extends: relaxed
+rules:
+  line-length:
+    max: 120
+  truthy:
+    check-keys: false    # `on:` in workflow files is a key, not a boolean
+  document-start: disable

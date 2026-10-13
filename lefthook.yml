@@ -1,0 +1,58 @@
+# Shared base for every repo that adopts github:zettlrobert/githooks. A consuming repo has only
+#   extends: [".githooks/share/githooks/lefthook.yml"]
+# where .githooks is a symlink into the nix store (githooks-install). All paths below are relative to the
+# consuming repo root, which is where git runs hooks. Formatters write and re-stage (stage_fixed), checkers
+# block. A job whose glob matches no staged file is skipped. README: how to opt out of a job or add one.
+min_version: 2.0.0
+assert_lefthook_installed: true   # a missing lefthook fails the commit instead of silently passing it
+rc: .githooks/share/githooks/lefthookrc   # puts the package bin dir on PATH for GUI git and plain terminals
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: shell
+      glob: "*.sh"
+      run: shfmt -i 2 -w {staged_files} && shellcheck {staged_files}
+      stage_fixed: true
+    - name: python
+      glob: "*.py"
+      run: ruff format {staged_files} && ruff check --fix {staged_files}
+      stage_fixed: true
+    - name: nix
+      glob: "*.nix"
+      run: >-
+        nixfmt {staged_files} && deadnix --fail {staged_files}
+        && for f in {staged_files}; do statix check "$f" || exit 1; done
+      stage_fixed: true
+    - name: yaml
+      glob: "*.{yml,yaml}"
+      run: yamllint -c .githooks/share/githooks/yamllint.yaml {staged_files}
+    - name: markdown
+      glob: "*.md"
+      run: markdownlint-cli2 --fix --config .githooks/share/githooks/markdownlint.yaml {staged_files}
+      stage_fixed: true
+    - name: toml
+      glob: "*.toml"
+      run: >-
+        taplo fmt --config .githooks/share/githooks/taplo.toml {staged_files}
+        && taplo check --config .githooks/share/githooks/taplo.toml {staged_files}
+      stage_fixed: true
+    - name: dockerfile
+      glob: "{Dockerfile,Dockerfile.*,*.Dockerfile}"
+      run: hadolint -c .githooks/share/githooks/hadolint.yaml {staged_files}
+    - name: actions
+      glob: "{.forgejo,.github}/workflows/*.{yml,yaml}"
+      run: actionlint -config-file .githooks/share/githooks/actionlint.yaml {staged_files}
+    - name: secrets
+      run: gitleaks git --pre-commit --staged --no-banner -c .githooks/share/githooks/gitleaks.toml
+
+commit-msg:
+  jobs:
+    - name: conventions
+      run: sh .githooks/share/githooks/commit-msg.sh {1}
+
+pre-push:
+  jobs:
+    - name: branch-and-junk-guard
+      run: sh .githooks/share/githooks/pre-push.sh {1} {2}
+      use_stdin: true
