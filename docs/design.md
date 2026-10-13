@@ -136,9 +136,16 @@ Both scripts print the rule that failed and an example of a valid value.
 ## README outline
 
 The README is the manual usage guide and the front page. Sections, in this order: what it is and why (three
-sentences, no history); install in a flake repo and in a repo without a flake (the exact lines, copy-paste
+sentences, no history); lefthook in a nutshell for readers who have never used it (a runner, not a linter:
+`lefthook.yml` lists hooks and jobs, a job is a command plus a `glob`, `lefthook install` writes stubs into
+`.git/hooks`, jobs run in parallel on the staged files, `stage_fixed` re-adds formatted files, `extends`
+merges the shared base, `lefthook run pre-commit --all-files` by hand, `LEFTHOOK=0 git commit` skips once);
+install in a flake repo and in a repo without a flake (the exact lines, copy-paste
 ready); what runs on commit (the job table above, with fix/check), what `just lint` and CI run; the
-conventions with one valid and one invalid example each, and the meaning of `junk` and `stash`; opt-in
+conventions with one valid and one invalid example each, the meaning of `junk` and `stash`, and which git
+commands never run the hook (revert and cherry-pick without an editor, stash, server-side commits);
+how linter rules are configured (every config file lives in the package next to the job that references
+it; a repo with its own rules writes its own job instead of extending the shared one); opt-in
 biome and per-repo jobs; bump the tools and rules; troubleshooting (hook not running, `Can't find lefthook`,
 `.githooks` dangling, stubs stale after a bump, GUI git); development (`just test`, `nix flake check`, layout);
 link to `docs/design.md`. Moving the source to the Forgejo instance later is one documented line
