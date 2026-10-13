@@ -16,7 +16,10 @@ MAX_LEN=120
 MIN_DESC=5
 
 msg_file="$1"
-[ -r "$msg_file" ] || { echo "commit-msg: cannot read $msg_file" >&2; exit 1; }
+[ -r "$msg_file" ] || {
+  echo "commit-msg: cannot read $msg_file" >&2
+  exit 1
+}
 
 # strip comment lines (core.commentChar/commentString aware) and everything after a scissors line
 cc=$(git config --get core.commentString 2>/dev/null || git config --get core.commentChar 2>/dev/null || echo '#')
@@ -37,7 +40,7 @@ subject=$(printf '%s\n' "$msg" | sed -n 1p)
 
 # subjects git writes itself
 case $subject in
-  "Merge "*|"Revert \""*|"Reapply \""*|"fixup! "*|"squash! "*|"amend! "*) exit 0 ;;
+"Merge "* | "Revert \""* | "Reapply \""* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
 esac
 
 if [ ${#subject} -gt $MAX_LEN ]; then
@@ -45,7 +48,7 @@ if [ ${#subject} -gt $MAX_LEN ]; then
   exit 1
 fi
 
-desc=${subject#*: }   # shortest prefix match: stops at the first ": "
+desc=${subject#*: } # shortest prefix match: stops at the first ": "
 if [ ${#desc} -lt $MIN_DESC ]; then
   printf 'commit-msg: FAIL description is under %s characters, e.g. "fix: resolve the dns lookup"\n' "$MIN_DESC" >&2
   exit 1
