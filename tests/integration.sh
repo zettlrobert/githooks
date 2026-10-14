@@ -55,7 +55,7 @@ pre-push:
 YML
 printf '.githooks\nlefthook-local.yml\n' >.gitignore
 ln -s "$PKG" .githooks
-"$PKG/bin/lefthook" install >"$LOG" 2>&1
+expect "lefthook install" "$PKG/bin/lefthook" install
 expect "stubs installed" test -x .git/hooks/pre-commit
 git add lefthook.yml .gitignore
 expect "bootstrap commit accepted" git commit -q -m "chore: bootstrap hooks"

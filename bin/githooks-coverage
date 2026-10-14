@@ -26,7 +26,20 @@ has() {
 # ignore types nothing lints: images, archives, locks, licences
 skip='png jpg jpeg gif svg ico webp pdf zip gz tar lock txt log csv'
 
-counts=$(git ls-files | sed -n -e 's#.*/##' -e 's/^Dockerfile\(\..*\)\{0,1\}$/dockerfile/p' \
+case ${1:-} in
+"" | --summary) ;;
+*)
+  echo "usage: githooks-coverage [--summary]" >&2
+  exit 0
+  ;;
+esac
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "githooks-coverage: not a git repository" >&2
+  exit 0
+fi
+# -z: git quotes non-ASCII names and names with quotes or control characters ("\303\244.md"), which would
+# hide the extension; NUL-separated output is never quoted
+counts=$(git ls-files -z | tr '\0' '\n' | sed -n -e 's#.*/##' -e 's/^[Dd]ockerfile\(\..*\)\{0,1\}$/dockerfile/p' \
   -e 's/^.\{1,\}\.\([A-Za-z0-9]\{1,\}\)$/\1/p' | tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -rn)
 uncovered=''
 n=0
@@ -38,7 +51,7 @@ while read -r count ext; do
   if has "$ext" "$base"; then
     status="base"
   elif has "$ext" "$optin"; then
-    status="opt-in (jobs/biome.yml)"
+    status="opt-in (if the repo extends jobs/biome.yml)"
   else
     status="uncovered: $(suggest "$ext")"
     n=$((n + 1))
