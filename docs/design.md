@@ -29,7 +29,7 @@ network at hook time. Tool versions pinned through nix, not through a second ver
 | nixfmt (RFC 166) | alejandra, nixpkgs-fmt | The formatter nixpkgs enforces. nixpkgs-fmt is archived. |
 | gitleaks in the hook, nothing else for secrets | trufflehog | MIT, static, offline; trufflehog verifies secrets over the network and is AGPL. |
 | Conventions: 14 commit types, lowercase, 120 chars, `<type>/<slug>` branches | commitlint `config-conventional` as is | Matches Conventional Commits; adds `devops`, `junk`, `stash` (throwaway types, blocked from `main` by pre-push) and `revert`. 120 instead of 100 is a solo-workflow choice. |
-| `just lint` = `lefthook run pre-commit --all-files --no-stage-fixed` plus `gitleaks dir .`; CI runs `lefthook run pre-commit --all-files --no-stage-fixed --fail-on-changes` and then `git diff --exit-code HEAD` | a second check-only hook | One job list for hook, terminal and CI. `--no-stage-fixed` because `stage_fixed` otherwise `git add`s every matched tracked file, including a developer's unrelated pending edits (verified). The staged-mode gitleaks job sees nothing under `--all-files`, hence the directory scan. In CI a formatter change fails twice over. |
+| `just lint` = `lefthook run pre-commit --all-files --no-stage-fixed` plus `gitleaks dir .`; CI runs `just lint` and then `git diff --exit-code HEAD` | a second check-only hook | One job list for hook, terminal and CI. `--no-stage-fixed` because `stage_fixed` otherwise `git add`s every matched tracked file, including a developer's unrelated pending edits (verified). The staged-mode gitleaks job sees nothing under `--all-files`, hence the directory scan. In CI a formatter change leaves a diff and fails the run. |
 
 ## Package layout (`githooks` flake)
 
@@ -64,8 +64,9 @@ markdownlint-cli2, taplo, hadolint, actionlint, biome, gitleaks. No git, no core
    packages, and `githooks-install` appended to the existing `shellHook`. The script runs
    `nix-store --realise <pkg> --add-root .githooks` (one command: symlink plus GC root; `--indirect` is a
    no-op on current nix) and `lefthook install` (idempotent; re-renders the stubs when the merged config
-   changes). It does nothing when `CI` is set or `.git` is missing: `lefthook run` needs no stubs, and the
-   persisted CI store must not collect a GC root per run. Each git worktree needs its own `.githooks`.
+   changes). With `CI` set it only makes the symlink: `lefthook run` needs no stubs, and the persisted CI
+   store must not collect a GC root per run. Outside a git repo, or without a `lefthook.yml`, it refuses
+   with exit 1 and says what to add. Each git worktree needs its own `.githooks`.
 2. `lefthook.yml`, committed (the canonical consumer file):
 
    ```yaml
@@ -123,8 +124,8 @@ pre-commit, `parallel: true`, `{staged_files}` filtered by glob, formatters with
 commit-msg: `hooks/commit-msg.sh`. pre-push: `hooks/pre-push.sh`. `assert_lefthook_installed: true` so a
 missing runner fails the commit instead of letting it through (verified: without it the stub exits 0). It only
 applies once the base config is loaded; the `githooks-present` guard job in the per-repo file covers the
-missing-base case. CI runs the hook with `--fail-on-changes` and follows it with `git diff --exit-code HEAD`,
-so a formatter change fails the run.
+missing-base case. CI runs `just lint` and follows it with `git diff --exit-code HEAD`, so a formatter
+change fails the run.
 
 Not in hooks: vale (style sync needs network), trufflehog, tests, `docker compose config` (repo-specific job in
 homelab, needs the docker CLI from that repo's shell).
