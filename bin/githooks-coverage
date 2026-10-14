@@ -1,2 +1,56 @@
 #!/bin/sh
-echo "githooks-coverage: not implemented yet"
+# githooks-coverage: which tracked file types are covered by the shared hooks. Advisory, always exits 0.
+#   githooks-coverage            table: extension, files, status (base | opt-in | uncovered: <tool>)
+#   githooks-coverage --summary  one line: "<n> uncovered types: ext (files) ..." or "all file types covered"
+# Keep the known-types table in sync with lefthook.yml and jobs/*.yml in github:zettlrobert/githooks.
+# Files without an extension (Caddyfile, justfile, LICENSE, .gitignore) are not listed; Dockerfile,
+# Dockerfile.* and *.Dockerfile count as dockerfile.
+export LC_ALL=C
+base='sh py nix yml yaml md toml dockerfile'
+optin='js mjs cjs ts tsx json jsonc'
+suggest() {
+  case $1 in
+  go) echo golangci-lint ;;
+  rs) echo "rustfmt, clippy" ;;
+  css | scss | html | vue | svelte) echo "biome (jobs/biome.yml) or prettier" ;;
+  tf | hcl) echo "tofu fmt" ;;
+  lua) echo stylua ;;
+  kt | java) echo ktlint ;;
+  *) echo "none known" ;;
+  esac
+}
+has() {
+  for w in $2; do [ "$w" = "$1" ] && return 0; done
+  return 1
+}
+# ignore types nothing lints: images, archives, locks, licences
+skip='png jpg jpeg gif svg ico webp pdf zip gz tar lock txt log csv'
+
+counts=$(git ls-files | sed -n -e 's#.*/##' -e 's/^Dockerfile\(\..*\)\{0,1\}$/dockerfile/p' \
+  -e 's/^.\{1,\}\.\([A-Za-z0-9]\{1,\}\)$/\1/p' | tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -rn)
+uncovered=''
+n=0
+summary=${1:-}
+[ "$summary" = "--summary" ] || printf '%-12s %6s  %s\n' extension files status
+while read -r count ext; do
+  [ -n "$ext" ] || continue
+  has "$ext" "$skip" && continue
+  if has "$ext" "$base"; then
+    status="base"
+  elif has "$ext" "$optin"; then
+    status="opt-in (jobs/biome.yml)"
+  else
+    status="uncovered: $(suggest "$ext")"
+    n=$((n + 1))
+    uncovered="$uncovered $ext ($count)"
+  fi
+  [ "$summary" = "--summary" ] || printf '%-12s %6s  %s\n' "$ext" "$count" "$status"
+done <<EOT
+$counts
+EOT
+if [ "$n" -eq 0 ]; then
+  echo "githooks-coverage: all file types covered"
+else
+  echo "githooks-coverage: $n uncovered types:$uncovered"
+fi
+exit 0
