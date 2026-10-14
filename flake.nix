@@ -52,7 +52,6 @@
             cp ${./bin/githooks-coverage} $out/bin/githooks-coverage
             chmod +x $out/bin/githooks-install $out/bin/githooks-coverage
           '';
-          passthru.shellHook = "githooks-install";
         };
     in
     {
@@ -78,6 +77,8 @@
               git config --global commit.gpgsign false
               git config --global init.defaultBranch main
               cp -r ${./.} src && chmod -R u+w src && cd src
+              shellcheck -s sh hooks/*.sh tests/*.sh bin/*
+              shfmt -i 2 -d hooks/*.sh tests/*.sh bin/*
               sh tests/run.sh
               if [ -f tests/integration.sh ]; then sh tests/integration.sh ${mkGithooks pkgs}; fi
               touch $out

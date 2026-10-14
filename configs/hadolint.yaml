@@ -1,3 +1,6 @@
 # hadolint rules shared by every repo.
 ignored:
   - DL3008   # pin apt versions: impractical on Debian base images, Renovate tracks the base tag instead
+# Block on error and warning, print info. The default threshold (info) blocks typical Debian Dockerfiles on
+# DL3009 (apt lists not deleted) and DL3015 (--no-install-recommends).
+failure-threshold: warning

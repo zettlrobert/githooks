@@ -1,6 +1,7 @@
 # Design: shared git hooks and linters as a nix flake
 
-Date: 2026-10-11. Status: approved; reviewed by three fresh-eyes reviews the same day (lefthook lab, scripts, nix), findings folded in. Hooks and tests implemented, flake pending. Scope: personal repos and own orgs (zettlrobert,
+Date: 2026-10-11. Status: approved; reviewed by three fresh-eyes reviews the same day (lefthook lab, scripts, nix),
+findings folded in. Hooks and tests implemented, flake pending. Scope: personal repos and own orgs (zettlrobert,
 blckbrd-org, zerodev-solutions, luminaria-life). Work repos keep their own tooling. Adoption is opt-in per
 repo; `homelab` goes first.
 
@@ -16,7 +17,7 @@ network at hook time. Tool versions pinned through nix, not through a second ver
 |---|---|---|
 | lefthook as the hook runner | prek/pre-commit, git-hooks.nix alone, hk | Only lefthook has fix-and-restage of staged files (`stage_fixed`), parallel jobs and glob filtering in plain YAML. prek and git-hooks.nix fail the commit on a formatting change instead of fixing it. hk has the best mechanics but is a year old with a breaking v2 last month and a Pkl config. |
 | Tools and config delivered as one nix package from this repo | lefthook `remotes` (git clone at install), pre-commit hook repos (clone and build per hook) | Store paths: fetched once when the input is locked, offline afterwards, pinned in the consumer's `flake.lock`. Two consumers pin it: each repo's dev shell (CI) and `nix-profiles` core-packages (global PATH). |
-| `extends` a path inside the repo (`.githooks/...`) | `LEFTHOOK_CONFIG`, remotes | `.githooks` is a symlink to the store path, created by the dev shell and registered as a GC root, so it cannot dangle. The per-repo file stays one line. |
+| `extends` a path inside the repo (`.githooks/...`) | `LEFTHOOK_CONFIG`, remotes | `.githooks` is a symlink to the store path, created by `githooks-install` and registered as a GC root, so garbage collection cannot dangle it. A fresh clone, a new worktree or a wiped store still can, and lefthook silently ignores a missing `extends` target, so the per-repo file carries a guard job that fails the commit until `githooks-install` has run. |
 | `rc` file with the package's `bin` baked in, referenced by the relative path `.githooks/share/githooks/lefthookrc` | relying on the dev shell or the global profile being active | GUI git and plain terminals run hooks without either: the installed stub sources `rc` before it looks for lefthook. Verified in the lab. `rc` applies to git-invoked hooks only, not to `lefthook run`, so `just lint` runs inside the dev shell. |
 | `symlinkJoin` plus `postBuild` for the package | `buildEnv`, `substituteAll` | `$out` is in scope in `postBuild`, so the rc file and the base config get the real store path; `substituteAll` is deprecated. No `git` or `coreutils` in the package: hooks run from a git process that already has them, and `bin/git` would collide with nix-profiles core. Closure about 350 MiB, dominated by node (markdownlint-cli2) and python (yamllint, actionlint). |
 | Consumers set `inputs.githooks.inputs.nixpkgs.follows = "nixpkgs"` | this flake's own nixpkgs pin everywhere | One toolchain closure and one nixpkgs source per repo (CI's persisted store would otherwise carry a second ~400 MiB closure). A consumer's nixpkgs bump can change formatter output; the PR check shows it. This flake keeps its own pin for `nix flake check`. |
@@ -28,13 +29,13 @@ network at hook time. Tool versions pinned through nix, not through a second ver
 | nixfmt (RFC 166) | alejandra, nixpkgs-fmt | The formatter nixpkgs enforces. nixpkgs-fmt is archived. |
 | gitleaks in the hook, nothing else for secrets | trufflehog | MIT, static, offline; trufflehog verifies secrets over the network and is AGPL. |
 | Conventions: 14 commit types, lowercase, 120 chars, `<type>/<slug>` branches | commitlint `config-conventional` as is | Matches Conventional Commits; adds `devops`, `junk`, `stash` (throwaway types, blocked from `main` by pre-push) and `revert`. 120 instead of 100 is a solo-workflow choice. |
-| `just lint` = `lefthook run pre-commit --all-files --no-stage-fixed` plus `gitleaks dir .`; CI adds `fail_on_changes: ci` on the hook and `git diff --exit-code HEAD` | a second check-only hook | One job list for hook, terminal and CI. `--no-stage-fixed` because `stage_fixed` otherwise `git add`s every matched tracked file, including a developer's unrelated pending edits (verified). The staged-mode gitleaks job sees nothing under `--all-files`, hence the directory scan. In CI a formatter change fails twice over. |
+| `just lint` = `lefthook run pre-commit --all-files --no-stage-fixed` plus `gitleaks dir .`; CI runs `lefthook run pre-commit --all-files --no-stage-fixed --fail-on-changes` and then `git diff --exit-code HEAD` | a second check-only hook | One job list for hook, terminal and CI. `--no-stage-fixed` because `stage_fixed` otherwise `git add`s every matched tracked file, including a developer's unrelated pending edits (verified). The staged-mode gitleaks job sees nothing under `--all-files`, hence the directory scan. In CI a formatter change fails twice over. |
 
 ## Package layout (`githooks` flake)
 
-```
-flake.nix                        # packages.<system>.default (symlinkJoin + postBuild), passthru.shellHook, checks
-lefthook.yml                     # shared base: hooks, jobs, globs, rc, assert_lefthook_installed, fail_on_changes: ci
+```text
+flake.nix                        # packages.<system>.default (symlinkJoin + postBuild), devShell, checks
+lefthook.yml                     # shared base: hooks, jobs, globs, rc, assert_lefthook_installed
 jobs/biome.yml                   # opt-in job file: a repo adds it to its extends list
 bin/githooks-install.in          # link .githooks as a GC root, lefthook install; skips in CI; @out@ substituted
 bin/githooks-coverage            # advisory: tracked file types vs base and opt-in jobs, names the tool for uncovered ones
@@ -65,14 +66,36 @@ markdownlint-cli2, taplo, hadolint, actionlint, biome, gitleaks. No git, no core
    no-op on current nix) and `lefthook install` (idempotent; re-renders the stubs when the merged config
    changes). It does nothing when `CI` is set or `.git` is missing: `lefthook run` needs no stubs, and the
    persisted CI store must not collect a GC root per run. Each git worktree needs its own `.githooks`.
-2. `lefthook.yml`, committed:
+2. `lefthook.yml`, committed (the canonical consumer file):
+
    ```yaml
+   # Shared hooks from github:zettlrobert/githooks. .githooks is a symlink into the nix store, made by
+   # githooks-install (run it once per clone and per worktree). Repo-specific jobs below merge with the base.
    extends: [".githooks/share/githooks/lefthook.yml"]
+
+   pre-commit:
+     jobs:
+       - name: githooks-present
+         run: >-
+           test -f .githooks/share/githooks/lefthook.yml
+           || { echo "githooks: .githooks is missing or dangling, run githooks-install" >&2; exit 1; }
+
+   pre-push:
+     jobs:
+       - name: githooks-present
+         run: >-
+           test -f .githooks/share/githooks/lefthook.yml
+           || { echo "githooks: .githooks is missing or dangling, run githooks-install" >&2; exit 1; }
    ```
+
+   The guard is there because lefthook silently ignores a missing `extends` target: without it a dangling or
+   missing `.githooks` (fresh clone, new worktree, store wiped) lets every commit through. `githooks-install`
+   must run once per git worktree, since `.githooks` lives in the worktree.
    Repo-specific jobs go under it and merge with the base. Opt-out of a base job: same job name with `skip: true`.
    Opt-in to biome: `extends: [".githooks/share/githooks/lefthook.yml", ".githooks/share/githooks/jobs/biome.yml"]`.
 3. `.gitignore`: `.githooks`, `lefthook-local.yml`.
-4. `justfile`: `lint` recipe = `lefthook run pre-commit --all-files --no-stage-fixed && gitleaks dir . -c .githooks/share/githooks/gitleaks.toml && githooks-coverage --summary`.
+4. `justfile`: `lint` recipe = `lefthook run pre-commit --all-files --no-stage-fixed`, then
+   `gitleaks dir . -c .githooks/share/githooks/gitleaks.toml`, then `githooks-coverage --summary`.
 5. CI: `nix develop --command just lint && git diff --exit-code HEAD` as a step after the existing checks.
 6. Without a flake (JavaScript repos with only `package.json`): `nix profile add github:zettlrobert/githooks`,
    then `githooks-install` in the repo; same `lefthook.yml` and `.gitignore` lines.
@@ -98,8 +121,10 @@ pre-commit, `parallel: true`, `{staged_files}` filtered by glob, formatters with
 | all staged | `gitleaks git --pre-commit --staged --no-banner -c <config>` | check |
 
 commit-msg: `hooks/commit-msg.sh`. pre-push: `hooks/pre-push.sh`. `assert_lefthook_installed: true` so a
-missing runner fails loudly instead of letting the commit through (verified: without it the stub exits 0).
-`fail_on_changes: ci` on pre-commit, so CI fails when a formatter had to change a file.
+missing runner fails the commit instead of letting it through (verified: without it the stub exits 0). It only
+applies once the base config is loaded; the `githooks-present` guard job in the per-repo file covers the
+missing-base case. CI runs the hook with `--fail-on-changes` and follows it with `git diff --exit-code HEAD`,
+so a formatter change fails the run.
 
 Not in hooks: vale (style sync needs network), trufflehog, tests, `docker compose config` (repo-specific job in
 homelab, needs the docker CLI from that repo's shell).
@@ -193,4 +218,6 @@ link to `docs/design.md`. Moving the source to the Forgejo instance later is one
 All three former open points resolved in favour of the design; no fallback is needed. Two behaviours to
 document for users: `rc` is sourced by git-invoked hooks only, so `just lint` runs inside the dev shell; the
 installed stubs bake the rc path, and `lefthook install` re-renders them on a bump, so a GUI commit between a
-bump and the next `nix develop` runs the previous, GC-rooted package.
+bump and the next `nix develop` runs the previous, GC-rooted package. `assert_lefthook_installed` guards the
+runner, not the base config: lefthook ignores a missing `extends` target, so the per-repo guard job is what
+catches a missing `.githooks`.

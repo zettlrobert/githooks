@@ -34,17 +34,20 @@ pre-commit:
     - name: toml
       glob: "*.toml"
       run: >-
-        taplo fmt --config .githooks/share/githooks/taplo.toml {staged_files}
-        && taplo check --config .githooks/share/githooks/taplo.toml {staged_files}
+        RUST_LOG=error taplo fmt --config .githooks/share/githooks/taplo.toml {staged_files}
+        && RUST_LOG=error taplo check --config .githooks/share/githooks/taplo.toml {staged_files}
       stage_fixed: true
     - name: dockerfile
-      glob: "{Dockerfile,Dockerfile.*,*.Dockerfile}"
+      glob:
+        - "{Dockerfile,Dockerfile.*}"
+        - "**/{Dockerfile,Dockerfile.*}"
+        - "*.Dockerfile"
       run: hadolint -c .githooks/share/githooks/hadolint.yaml {staged_files}
     - name: actions
       glob: "{.forgejo,.github}/workflows/*.{yml,yaml}"
       run: actionlint -config-file .githooks/share/githooks/actionlint.yaml {staged_files}
     - name: secrets
-      run: gitleaks git --pre-commit --staged --no-banner -c .githooks/share/githooks/gitleaks.toml
+      run: gitleaks git --pre-commit --staged --no-banner -v -c .githooks/share/githooks/gitleaks.toml
 
 commit-msg:
   jobs:
