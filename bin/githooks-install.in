@@ -1,2 +1,24 @@
 #!/bin/sh
-echo "githooks-install from @out@"
+# githooks-install: connect the current repo to this githooks package and install the lefthook stubs.
+#   .githooks -> this package (a symlink registered as a nix GC root, so garbage collection keeps it)
+#   lefthook install  (idempotent; re-renders the stubs when the merged config changed)
+# Run once per clone and once per git worktree (.githooks lives in the worktree). In CI only the symlink is
+# made: `lefthook run` needs no stubs, and the persisted CI store must not collect one GC root per run.
+# @out@ is substituted at build time.
+set -eu
+pkg="@out@"
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "githooks-install: not inside a git repo" >&2
+  exit 1
+}
+cd "$root"
+if [ ! -f lefthook.yml ]; then
+  printf 'githooks-install: no lefthook.yml in %s\nadd one with:\n  extends: [".githooks/share/githooks/lefthook.yml"]\n' "$root" >&2
+  exit 1
+fi
+if [ -n "${CI:-}" ]; then
+  ln -sfn "$pkg" .githooks
+  exit 0
+fi
+nix-store --realise "$pkg" --add-root .githooks >/dev/null
+"$pkg/bin/lefthook" install
