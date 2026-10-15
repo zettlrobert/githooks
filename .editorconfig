@@ -1,0 +1,30 @@
+# Shared editor defaults. Not read from the package: copy it to the repo root as .editorconfig
+#   cp .githooks/share/githooks/editorconfig .editorconfig
+# The formatters pass their own flags (shfmt -i 2), so this only aligns the editor with them.
+# Comments stay on their own lines: EditorConfig has no inline comments.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# List continuations indent to the marker (3 spaces after "1. "), markdownlint owns that.
+# Two trailing spaces are a markdown line break.
+[*.md]
+indent_size = unset
+trim_trailing_whitespace = false
+
+# What just --fmt writes.
+[justfile]
+indent_size = 4
+
+# make requires tabs; caddy fmt and gofmt write them.
+[{Makefile,*.mk,Caddyfile,*.go}]
+indent_style = tab
+
+[*.py]
+indent_size = 4
