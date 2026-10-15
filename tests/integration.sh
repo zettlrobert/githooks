@@ -58,6 +58,7 @@ printf '.githooks\nlefthook-local.yml\n' >.gitignore
 ln -s "$PKG" .githooks
 expect "lefthook install" "$PKG/bin/lefthook" install
 expect "stubs installed" test -x .git/hooks/pre-commit
+expect "editorconfig template shipped" test -f .githooks/share/githooks/editorconfig
 git add lefthook.yml .gitignore
 expect "bootstrap commit accepted" git commit -q -m "chore: bootstrap hooks"
 
