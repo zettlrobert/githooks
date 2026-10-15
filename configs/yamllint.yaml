@@ -4,3 +4,7 @@ rules:
   line-length:
     max: 120
   document-start: disable
+  octal-values:              # `mode: 0644` is the number 420 in YAML 1.1, `0o644` the same in 1.2: quote it
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+    level: error             # relaxed downgrades rules to warnings, which do not fail the commit

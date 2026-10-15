@@ -78,6 +78,10 @@ printf '#!/bin/sh\necho "$(false | wc -l)"\n' >e.sh && git add e.sh
 refuse "optional shellcheck check blocks the commit" SC2312 git commit -q -m "feat: add e"
 git reset -q e.sh && rm -f e.sh
 
+printf 'mode: 0644\n' >f.yml && git add f.yml
+refuse "implicit octal in yaml blocks the commit" octal-values git commit -q -m "feat: add f"
+git reset -q f.yml && rm -f f.yml
+
 echo "# Title" >c.md && git add c.md
 refuse "bad subject rejected" "commit-msg: FAIL subject" git commit -q -m "Docs: Add Title"
 expect "good subject accepted" git commit -q -m "docs: add title"
