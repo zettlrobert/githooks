@@ -88,9 +88,9 @@ printf 'FROM alpine:3.20\nRUN cd /tmp && apk add --no-cache curl\n' >Dockerfile 
 refuse "hadolint warning blocks the commit" DL3003 git commit -q -m "fix: change the dockerfile"
 git reset -q Dockerfile && git checkout -q Dockerfile
 
-echo "# Title" >c.md && git add c.md
+printf '# T\n\n## A\n\n### Verify\n\nx\n\n## B\n\n### Verify\n\ny\n' >c.md && git add c.md
 refuse "bad subject rejected" "commit-msg: FAIL subject" git commit -q -m "Docs: Add Title"
-expect "good subject accepted" git commit -q -m "docs: add title"
+expect "good subject accepted, sibling duplicate headings pass" git commit -q -m "docs: add title"
 
 expect "all-files run" env PATH="$PKG/bin:$PATH" "$PKG/bin/lefthook" run pre-commit --all-files --no-stage-fixed
 
