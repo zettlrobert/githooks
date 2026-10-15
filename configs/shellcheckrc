@@ -1,0 +1,8 @@
+# shellcheck defaults for the editor and a bare terminal: link ~/.config/shellcheckrc here. shellcheck reads it
+# only when the script's directory tree has no .shellcheckrc. The hook passes the same checks with -o (CI has
+# no home config); tests/run.sh fails when the two lists drift apart.
+enable=check-extra-masked-returns
+enable=check-set-e-suppressed
+enable=require-double-brackets
+enable=add-default-case
+enable=quote-safe-variables

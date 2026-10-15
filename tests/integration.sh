@@ -107,6 +107,16 @@ expect "a repo .markdownlint-cli2.yaml overrides one shared rule" git commit -q 
 
 expect "all-files run" env PATH="$PKG/bin:$PATH" "$PKG/bin/lefthook" run pre-commit --all-files --no-stage-fixed
 
+# editor and terminal: shellcheck reads the shipped shellcheckrc through ~/.config, a repo .shellcheckrc wins
+mkdir -p "$TMP/xdg" && ln -s "$PKG/share/githooks/shellcheckrc" "$TMP/xdg/shellcheckrc"
+# shellcheck disable=SC2016 # the literal is the point: a masked exit code (SC2312)
+printf '#!/bin/sh\nprintf "%%s\\n" "$(false | wc -l)"\n' >g.sh
+refuse "a linked XDG shellcheckrc enables the optional checks" SC2312 env HOME="$TMP" XDG_CONFIG_HOME="$TMP/xdg" "$PKG/bin/shellcheck" g.sh
+expect "without it they stay off" env HOME="$TMP" XDG_CONFIG_HOME="$TMP/none" "$PKG/bin/shellcheck" g.sh
+printf 'disable=SC2312\n' >.shellcheckrc
+expect "a repo .shellcheckrc takes precedence" env HOME="$TMP" XDG_CONFIG_HOME="$TMP/xdg" "$PKG/bin/shellcheck" g.sh
+rm -f g.sh .shellcheckrc
+
 rm .githooks && echo x >d.md && git add d.md
 refuse "missing .githooks blocks the commit" "githooks: .githooks is missing" git commit -q -m "docs: add d"
 ln -s "$PKG" .githooks
