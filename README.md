@@ -121,6 +121,21 @@ pre-commit:
 Opt in to biome by adding `.githooks/share/githooks/jobs/biome.yml` to the `extends` list. Shared rules live
 in [`configs/`](configs/).
 
+### Same rules in the editor and terminal
+
+With the package in your profile, link the tools' user configs to it. Each tool reads its user config only when the
+repo has none, so repo files still win:
+
+```bash
+mkdir -p ~/.config/yamllint
+ln -s ~/.nix-profile/share/githooks/yamllint.yaml ~/.config/yamllint/config
+ln -s ~/.nix-profile/share/githooks/hadolint.yaml ~/.config/hadolint.yaml
+ln -s ~/.nix-profile/share/githooks/shellcheckrc ~/.config/shellcheckrc
+```
+
+markdownlint-cli2 has no user config: point the editor at
+`--config ~/.nix-profile/share/githooks/markdownlint.yaml`.
+
 ## Update
 
 `nix flake update githooks && nix develop` in the repo, or `nix profile upgrade githooks` and

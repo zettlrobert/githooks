@@ -50,6 +50,7 @@ configs/markdownlint.yaml        # line length 120, tables and code blocks exemp
 configs/yamllint.yaml            # relaxed base, line length 120, document-start off, octal values are errors
 configs/hadolint.yaml            # no version pins for apt, apk, pip; fail on warning
 configs/editorconfig             # template a repo copies to .editorconfig (not extendable)
+configs/shellcheckrc             # the shell job's optional checks, for ~/.config/shellcheckrc (drift-tested)
 configs/actionlint.yaml          # self-hosted-runner labels: [docker], else "label docker is unknown"
 configs/gitleaks.toml            # default rules plus the pass/placeholder allowlist
 configs/biome.json               # format + recommended lint
