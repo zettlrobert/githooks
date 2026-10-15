@@ -13,6 +13,23 @@
       ];
       forAll = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
+      # yamllint 1.38.0 (2026-01) is not in nixpkgs yet, while Mason ships it, so zeronvim's :LintVersions reports
+      # the hooks as behind. The override switches itself off once nixpkgs has 1.38.0 or newer; delete it then.
+      yamllint =
+        pkgs:
+        if pkgs.lib.versionOlder pkgs.yamllint.version "1.38.0" then
+          pkgs.yamllint.overridePythonAttrs (_: rec {
+            version = "1.38.0";
+            src = pkgs.fetchFromGitHub {
+              owner = "adrienverge";
+              repo = "yamllint";
+              tag = "v${version}";
+              hash = "sha256-4H8tbn2TRzTGIXmP9Hnmc93rGSLsWh5A5R9KAIz0mKM=";
+            };
+          })
+        else
+          pkgs.yamllint;
+
       # Every linter the base lefthook.yml and jobs/*.yml call. No git, no coreutils: hooks run from a git
       # process that has both, and bin/git would collide with nix-profiles core.
       tools =
@@ -24,7 +41,7 @@
           nixfmt
           statix
           deadnix
-          yamllint
+          (yamllint pkgs)
           markdownlint-cli2
           taplo
           hadolint
