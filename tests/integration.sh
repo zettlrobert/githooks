@@ -1,7 +1,8 @@
 #!/bin/sh
 # End-to-end: a consuming repo with the guarded lefthook.yml, .githooks linked to the package given as $1.
 # Proves: stubs install, a formatter fix lands in the commit, a linter finding (also an optional shellcheck
-# check) and a bad subject are rejected,
+# check) and a bad subject are rejected, a repo .markdownlint-cli2.yaml overrides one shared rule
+# and keeps the rest (the --all-files run re-checks c.md under MD024 siblings_only),
 # --all-files works, a missing .githooks link blocks the commit. Hook output goes to $TMP/log, shown on failure.
 set -eu
 PKG=${1:?usage: tests/integration.sh <githooks package path>}
@@ -92,6 +93,17 @@ git reset -q Dockerfile && git checkout -q Dockerfile
 printf '# T\n\n## A\n\n### Verify\n\nx\n\n## B\n\n### Verify\n\ny\n' >c.md && git add c.md
 refuse "bad subject rejected" "commit-msg: FAIL subject" git commit -q -m "Docs: Add Title"
 expect "good subject accepted, sibling duplicate headings pass" git commit -q -m "docs: add title"
+
+cat >n.md <<'MD'
+# Notes
+
+One paragraph per line, the way Obsidian writes notes: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
+MD
+git add n.md
+refuse "markdown line over 120 blocks the commit" MD013 git commit -q -m "docs: add notes"
+# .markdownlint-cli2.yaml merges with the shared rules; a .markdownlint.yaml would replace them (MD024 back)
+printf 'config:\n  MD013: false\n' >.markdownlint-cli2.yaml && git add .markdownlint-cli2.yaml
+expect "a repo .markdownlint-cli2.yaml overrides one shared rule" git commit -q -m "docs: add notes without a line limit"
 
 expect "all-files run" env PATH="$PKG/bin:$PATH" "$PKG/bin/lefthook" run pre-commit --all-files --no-stage-fixed
 
