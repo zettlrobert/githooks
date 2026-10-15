@@ -1,6 +1,8 @@
 # hadolint rules shared by every repo.
 ignored:
   - DL3008   # pin apt versions: impractical on Debian base images, Renovate tracks the base tag instead
+  - DL3018   # pin apk versions: same on Alpine, old versions leave the index and break the build
+  - DL3013   # pin pip versions: pin in a requirements or lock file instead of the Dockerfile
 # Block on error and warning, print info. The default threshold (info) blocks typical Debian Dockerfiles on
 # DL3009 (apt lists not deleted) and DL3015 (--no-install-recommends).
 failure-threshold: warning

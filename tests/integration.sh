@@ -82,6 +82,12 @@ printf 'mode: 0644\n' >f.yml && git add f.yml
 refuse "implicit octal in yaml blocks the commit" octal-values git commit -q -m "feat: add f"
 git reset -q f.yml && rm -f f.yml
 
+printf 'FROM alpine:3.20\nRUN apk add --no-cache curl\n' >Dockerfile && git add Dockerfile
+expect "unpinned apk add is accepted" git commit -q -m "feat: add a dockerfile"
+printf 'FROM alpine:3.20\nRUN cd /tmp && apk add --no-cache curl\n' >Dockerfile && git add Dockerfile
+refuse "hadolint warning blocks the commit" DL3003 git commit -q -m "fix: change the dockerfile"
+git reset -q Dockerfile && git checkout -q Dockerfile
+
 echo "# Title" >c.md && git add c.md
 refuse "bad subject rejected" "commit-msg: FAIL subject" git commit -q -m "Docs: Add Title"
 expect "good subject accepted" git commit -q -m "docs: add title"
