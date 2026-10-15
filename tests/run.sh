@@ -58,5 +58,11 @@ pp 0 "delete line" "(delete) $Z refs/heads/feat/y $FINE"
 pp 0 "tag line" "refs/tags/v1 $FINE refs/tags/v1 $Z"
 pp 0 "HEAD pushed to a valid branch" "HEAD $FINE refs/heads/junk/zz $Z"
 
+# --- shared config drift ------------------------------------------------------
+# the shell job's -o list and configs/shellcheckrc (the editor's copy) must name the same optional checks
+job=$(sed -n 's/.*shellcheck -o \([a-z,-]*\).*/\1/p' "$HERE/../lefthook.yml" | tr ',' '\n' | sort)
+rc=$(sed -n 's/^enable=//p' "$HERE/../configs/shellcheckrc" | sort)
+if [ -n "$job" ] && [ "$job" = "$rc" ]; then ok "shellcheckrc matches the shell job's -o list"; else nok "shellcheckrc matches the shell job's -o list"; fi
+
 printf '%s of %s checks passed\n' "$((n - fail))" "$n"
 [ "$fail" -eq 0 ]
