@@ -9,6 +9,7 @@
 export LC_ALL=C
 
 TYPES='build|chore|ci|devops|docs|feat|fix|junk|perf|refactor|revert|stash|style|test'
+TYPE_LIST=$(printf '%s' "$TYPES" | tr '|' ' ')
 SUBJECT_RE="^($TYPES)(\([a-z0-9._/-]+\))?!?: [a-z0-9][a-z0-9 _./,+:;=()'>-]*[a-z0-9)]\$"
 # attribution forms only, not the bare product names: a commit about configuring a tool stays legal
 AI_RE='^co-authored-by:.*(anthropic|claude|copilot|chatgpt|gemini|openai)|noreply@anthropic\.com|generated with.*(claude|copilot|chatgpt|gemini|anthropic)|^claude-session:|🤖'
@@ -41,22 +42,23 @@ subject=$(printf '%s\n' "$msg" | sed -n 1p)
 # subjects git writes itself
 case $subject in
 "Merge "* | "Revert \""* | "Reapply \""* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
+*) ;;
 esac
 
-if [ ${#subject} -gt $MAX_LEN ]; then
+if [ ${#subject} -gt "$MAX_LEN" ]; then
   printf 'commit-msg: FAIL subject is %s characters, maximum is %s\n' "${#subject}" "$MAX_LEN" >&2
   exit 1
 fi
 
 desc=${subject#*: } # shortest prefix match: stops at the first ": "
-if [ ${#desc} -lt $MIN_DESC ]; then
+if [ ${#desc} -lt "$MIN_DESC" ]; then
   printf 'commit-msg: FAIL description is under %s characters, e.g. "fix: resolve the dns lookup"\n' "$MIN_DESC" >&2
   exit 1
 fi
 
 if ! printf '%s\n' "$subject" | grep -Eq "$SUBJECT_RE"; then
   printf 'commit-msg: FAIL subject must be "<type>(<scope>)!: <lowercase description>", no trailing period\n' >&2
-  printf '  types: %s\n  example: feat(caddy): add the paperless route\n  got: %s\n' "$(printf '%s' "$TYPES" | tr '|' ' ')" "$subject" >&2
+  printf '  types: %s\n  example: feat(caddy): add the paperless route\n  got: %s\n' "$TYPE_LIST" "$subject" >&2
   exit 1
 fi
 

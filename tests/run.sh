@@ -22,7 +22,7 @@ nok() {
 # --- commit-msg ---------------------------------------------------------------
 git init -q "$TMP/cm" && cd "$TMP/cm" && git config user.email t@t && git config user.name t
 for f in "$HERE"/commit-msg/pass/*.msg; do
-  case $f in *commentchar-semicolon*) git config core.commentChar ';' ;; esac
+  case $f in *commentchar-semicolon*) git config core.commentChar ';' ;; *) ;; esac
   if sh "$HOOKS/commit-msg.sh" "$f" 2>/dev/null; then ok "accept $(basename "$f")"; else nok "accept $(basename "$f")"; fi
   git config --unset core.commentChar 2>/dev/null || true
 done

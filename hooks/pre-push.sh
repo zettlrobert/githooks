@@ -7,6 +7,7 @@
 export LC_ALL=C
 
 TYPES='build|chore|ci|devops|docs|feat|fix|junk|perf|refactor|revert|stash|style|test|renovate|wip'
+TYPE_LIST=$(printf '%s' "$TYPES" | tr '|' ' ')
 BRANCH_RE="^($TYPES)/([0-9]+/)?[a-z0-9._-]+\$"
 remote="$1"
 rc=0
@@ -34,11 +35,11 @@ while read -r _ lsha rref rsha; do # local ref unused
     ;;
   *)
     if ! printf '%s' "$branch" | grep -Eq "$BRANCH_RE"; then
-      printf 'pre-push: FAIL branch "%s" must be <type>/<optional number>/<slug>, e.g. feat/123/add-thing\n  types: %s\n  rename with: git branch -m <new name>\n' "$branch" "$(printf '%s' "$TYPES" | tr '|' ' ')" >&2
+      printf 'pre-push: FAIL branch "%s" must be <type>/<optional number>/<slug>, e.g. feat/123/add-thing\n  types: %s\n  rename with: git branch -m <new name>\n' "$branch" "$TYPE_LIST" >&2
       rc=1
     fi
     ;;
   esac
 done
 
-exit $rc
+exit "$rc"

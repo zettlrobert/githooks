@@ -62,8 +62,10 @@ expect "bootstrap commit accepted" git commit -q -m "chore: bootstrap hooks"
 
 printf '#!/bin/sh\necho   "x"\n' >a.sh && git add a.sh
 expect "commit with a formatter fix" git commit -q -m "feat: add a script"
-expect "fixed content is what got committed" test "$(git show HEAD:a.sh | sed -n 2p)" = 'echo "x"'
-expect "tree clean after the fix" test -z "$(git status --porcelain)"
+committed=$(git show HEAD:a.sh | sed -n 2p)
+expect "fixed content is what got committed" test "$committed" = 'echo "x"'
+status=$(git status --porcelain)
+expect "tree clean after the fix" test -z "$status"
 
 # shellcheck disable=SC2016 # the literal $(ls) is the point: an unused variable, SC2034
 printf '#!/bin/sh\nfoo=$(ls)\n' >b.sh && git add b.sh
