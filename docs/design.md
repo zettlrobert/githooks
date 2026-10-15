@@ -29,6 +29,11 @@ network at hook time. Tool versions pinned through nix, not through a second ver
 | nixfmt (RFC 166) | alejandra, nixpkgs-fmt | The formatter nixpkgs enforces. nixpkgs-fmt is archived. |
 | gitleaks in the hook, nothing else for secrets | trufflehog | MIT, static, offline; trufflehog verifies secrets over the network and is AGPL. |
 | Conventions: 14 commit types, lowercase, 120 chars, `<type>/<slug>` branches | commitlint `config-conventional` as is | Matches Conventional Commits; adds `devops`, `junk`, `stash` (throwaway types, blocked from `main` by pre-push) and `revert`. 120 instead of 100 is a solo-workflow choice. |
+| shellcheck with five optional checks: `check-extra-masked-returns`, `check-set-e-suppressed`, `require-double-brackets`, `add-default-case`, `quote-safe-variables` | `enable=all`; default checks only | Each of the five flags a real failure mode (lost exit code, `set -e` silently off, `[ ]` pitfalls in bash, unhandled `case`). `enable=all` is dominated by `require-variable-braces` (SC2250): 253 of 296 findings in homelab, all style. Passed by flag, so a repo `.shellcheckrc` can still `disable=` any of them. |
+| Repo overrides: `.markdownlint-cli2.yaml` and `.shellcheckrc` merge with the shared rules; other tools need a replacement job | one override mechanism for every tool | markdownlint-cli2 merges a repo `.markdownlint-cli2.yaml` (also per directory) over `--config`; a repo `.markdownlint.yaml` replaces it instead (verified: MD024, MD033 back to defaults). yamllint, hadolint, actionlint and gitleaks take `-c` and ignore repo files. Line length stays 120 in the base; note repos (Obsidian, one paragraph per line: 5,936 prose lines over 120 in the vault) set `MD013: false`. |
+| yamllint `octal-values` as errors; not `quoted-strings: only-when-needed`, not `empty-values` | the horizon yamllint set as is | `mode: 0644` is 420 in YAML 1.1. `quoted-strings` flagged 160 compose idioms in homelab (`TZ: "Europe/Berlin"`, healthcheck arrays); `empty-values` flags the compose named-volume form `name:`. |
+| hadolint ignores DL3008, DL3018, DL3013 | pinning apt, apk and pip versions in Dockerfiles | Old versions leave the distro index and break rebuilds; Renovate tracks the base image tag, Python pins belong in a lock file. |
+| `editorconfig` shipped as a template the repo copies | linking it from the package | Editors look for `.editorconfig` in the repo tree only; there is no extends. Markdown `indent_size` is unset (list continuations indent to the marker, markdownlint owns it); tabs for Makefile, Caddyfile, Go. |
 | `just lint` = `lefthook run pre-commit --all-files --no-stage-fixed` plus `gitleaks dir .`; CI runs `just lint` and then `git diff --exit-code HEAD` | a second check-only hook | One job list for hook, terminal and CI. `--no-stage-fixed` because `stage_fixed` otherwise `git add`s every matched tracked file, including a developer's unrelated pending edits (verified). The staged-mode gitleaks job sees nothing under `--all-files`, hence the directory scan. In CI a formatter change leaves a diff and fails the run. |
 
 ## Package layout (`githooks` flake)
@@ -41,8 +46,10 @@ bin/githooks-install.in          # link .githooks as a GC root, lefthook install
 bin/githooks-coverage            # advisory: tracked file types vs base and opt-in jobs, names the tool for uncovered ones
 hooks/commit-msg.sh              # conventions, see below (done)
 hooks/pre-push.sh                # branch pattern, junk/stash guard (done)
-configs/.markdownlint-cli2.yaml  # line length 120, tables and code blocks exempt
-configs/.yamllint.yaml           # relaxed base, line length 120, document-start off
+configs/markdownlint.yaml        # line length 120, tables and code blocks exempt, MD024 siblings only
+configs/yamllint.yaml            # relaxed base, line length 120, document-start off, octal values are errors
+configs/hadolint.yaml            # no version pins for apt, apk, pip; fail on warning
+configs/editorconfig             # template a repo copies to .editorconfig (not extendable)
 configs/actionlint.yaml          # self-hosted-runner labels: [docker], else "label docker is unknown"
 configs/gitleaks.toml            # default rules plus the pass/placeholder allowlist
 configs/biome.json               # format + recommended lint
@@ -110,7 +117,7 @@ pre-commit, `parallel: true`, `{staged_files}` filtered by glob, formatters with
 
 | Glob | Command | Mode |
 |---|---|---|
-| `*.sh` | `shfmt -w`, then `shellcheck` (one piped group, so the check sees the formatted file under `parallel: true`) | fix, check |
+| `*.sh` | `shfmt -w`, then `shellcheck -o <five optional checks>` (one piped group, so the check sees the formatted file under `parallel: true`) | fix, check |
 | `*.py` | `ruff format`, `ruff check --fix` | fix, check |
 | `*.nix` | `nixfmt`, `statix check`, `deadnix --fail` | fix, check, check |
 | `*.{yml,yaml}` | `yamllint -c <config>` | check |
@@ -127,7 +134,8 @@ applies once the base config is loaded; the `githooks-present` guard job in the 
 missing-base case. CI runs `just lint` and follows it with `git diff --exit-code HEAD`, so a formatter
 change fails the run.
 
-Not in hooks: vale (style sync needs network), trufflehog, tests, `docker compose config` (repo-specific job in
+Not in hooks: vale (style sync needs network), osv-scanner, trivy and grype (vulnerability databases need network;
+a CI-only job is the option), trufflehog, tests, `docker compose config` (repo-specific job in
 homelab, needs the docker CLI from that repo's shell).
 
 ## Coverage report (`githooks-coverage`)
@@ -193,6 +201,10 @@ link to `docs/design.md`. Moving the source to the Forgejo instance later is one
 
 - `tests/run.sh` (done): 36 commit-msg fixtures and 13 pre-push cases, 49 checks, run by `just test` and
   by `nix flake check` (sandbox: git in `nativeBuildInputs`, `HOME=$TMPDIR`, no network).
+- `tests/integration.sh`: 18 end-to-end checks in a consumer repo against the built package, also run by
+  `nix flake check`. Besides the basics it proves each shared rule change of 2026-10-15 blocks or passes as
+  intended: an optional shellcheck check (SC2312), a yaml octal, an unpinned `apk add` accepted while a
+  hadolint warning blocks, sibling duplicate headings, and a repo `.markdownlint-cli2.yaml` relaxing MD013.
 - Lefthook behaviour proven in a scratch lab on 2026-10-11 (lefthook 2.1.14): relative `extends` resolves
   against the repo root from any subdirectory through a symlink outside the repo; `rc` from the extended file
   is sourced by the installed stub; jobs merge by name and `skip: true` disables a base job; `stage_fixed`

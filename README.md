@@ -45,7 +45,8 @@ match, formatters re-stage what they fix, and any failing job blocks the commit.
            || { echo "githooks: .githooks is missing or dangling, run githooks-install" >&2; exit 1; }
    ```
 
-3. Add `.githooks` and `lefthook-local.yml` to `.gitignore`.
+3. Add `.githooks` and `lefthook-local.yml` to `.gitignore`, and copy the editor defaults:
+   `cp .githooks/share/githooks/editorconfig .editorconfig` (lefthook cannot extend it, so each repo commits a copy).
 
 4. Run `nix develop` once per clone and per worktree. From then on every commit runs the hooks.
 
@@ -64,7 +65,7 @@ lint:
 
 | Files                                         | Tools                   | Mode       |
 | --------------------------------------------- | ----------------------- | ---------- |
-| `*.sh`                                        | shfmt, shellcheck       | fix, check |
+| `*.sh`                                        | shfmt, shellcheck (1)   | fix, check |
 | `*.py`                                        | ruff format, ruff check | fix, check |
 | `*.nix`                                       | nixfmt, deadnix, statix | fix, check |
 | `*.yml`, `*.yaml`                             | yamllint                | check      |
@@ -74,6 +75,9 @@ lint:
 | `.forgejo/workflows/*`, `.github/workflows/*` | actionlint              | check      |
 | every staged change                           | gitleaks                | check      |
 | `*.js`, `*.ts`, `*.json` and friends          | biome, opt-in           | fix, check |
+
+(1) Plus the optional checks that catch bugs: masked exit codes, `set -e` lost in conditions, `[ ]` in bash,
+`case` without a default, unquoted `$?`.
 
 Jobs whose glob matches nothing are skipped. `githooks-coverage` lists the repo's file types and flags those
 without a job. Scripts without an extension are not matched; name them `.sh` or add a job.
@@ -92,17 +96,26 @@ without a job. Scripts without an extension are not matched; name them `.sh` or 
 
 ## Configure
 
-Override a shared job by name in the repo's `lefthook.yml`, then add your own:
+Two tools read a repo file on top of the shared rules, so one rule can change without touching the job:
+
+| Tool         | Repo file                 | Example                                         |
+| ------------ | ------------------------- | ----------------------------------------------- |
+| markdownlint | `.markdownlint-cli2.yaml` | `config: { MD013: false }` for a notes repo     |
+| shellcheck   | `.shellcheckrc`           | `disable=SC2312`                                |
+
+Use `.markdownlint-cli2.yaml`, not `.markdownlint.yaml`: the second replaces the shared rules instead of
+merging with them. Either file also works in a subdirectory and applies only there.
+
+The other tools take the shared config by flag. Override those jobs by name in the repo's `lefthook.yml`:
 
 ```yaml
 pre-commit:
   jobs:
-    - name: markdown
+    - name: yaml
       skip: true
-    - name: markdown-strict
-      glob: '*.md'
-      run: markdownlint-cli2 --fix --config .markdownlint.yaml {staged_files}
-      stage_fixed: true
+    - name: yaml-strict
+      glob: '*.{yml,yaml}'
+      run: yamllint -c .yamllint.yaml {staged_files}
 ```
 
 Opt in to biome by adding `.githooks/share/githooks/jobs/biome.yml` to the `extends` list. Shared rules live
