@@ -1,6 +1,7 @@
 #!/bin/sh
 # End-to-end: a consuming repo with the guarded lefthook.yml, .githooks linked to the package given as $1.
-# Proves: stubs install, a formatter fix lands in the commit, a linter finding and a bad subject are rejected,
+# Proves: stubs install, a formatter fix lands in the commit, a linter finding (also an optional shellcheck
+# check) and a bad subject are rejected,
 # --all-files works, a missing .githooks link blocks the commit. Hook output goes to $TMP/log, shown on failure.
 set -eu
 PKG=${1:?usage: tests/integration.sh <githooks package path>}
@@ -71,6 +72,11 @@ expect "tree clean after the fix" test -z "$status"
 printf '#!/bin/sh\nfoo=$(ls)\n' >b.sh && git add b.sh
 refuse "shellcheck finding blocks the commit" SC2034 git commit -q -m "feat: add b"
 git reset -q b.sh && rm -f b.sh
+
+# shellcheck disable=SC2016 # the literal is the point: a masked exit code, an optional check (SC2312)
+printf '#!/bin/sh\necho "$(false | wc -l)"\n' >e.sh && git add e.sh
+refuse "optional shellcheck check blocks the commit" SC2312 git commit -q -m "feat: add e"
+git reset -q e.sh && rm -f e.sh
 
 echo "# Title" >c.md && git add c.md
 refuse "bad subject rejected" "commit-msg: FAIL subject" git commit -q -m "Docs: Add Title"

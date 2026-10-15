@@ -12,7 +12,13 @@ pre-commit:
   jobs:
     - name: shell
       glob: "*.sh"
-      run: shfmt -i 2 -w {staged_files} && shellcheck {staged_files}
+      # optional checks that catch real bugs: masked exit codes, set -e lost in conditions, [ ] in bash,
+      # case without a default, unquoted $? and friends. Not require-variable-braces: noise, no bugs.
+      # A repo .shellcheckrc can still disable= any of them.
+      run: >-
+        shfmt -i 2 -w {staged_files}
+        && shellcheck -o check-extra-masked-returns,check-set-e-suppressed,require-double-brackets,add-default-case,quote-safe-variables
+        {staged_files}
       stage_fixed: true
     - name: python
       glob: "*.py"

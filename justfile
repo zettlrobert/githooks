@@ -21,5 +21,5 @@ check:
 # run this repo's own hooks on every tracked file (dogfooding)
 lint:
     lefthook run pre-commit --all-files --no-stage-fixed
-    shellcheck -s sh hooks/*.sh tests/*.sh bin/*
+    shellcheck -s sh -o check-extra-masked-returns,check-set-e-suppressed,require-double-brackets,add-default-case,quote-safe-variables hooks/*.sh tests/*.sh bin/*
     shfmt -i 2 -d hooks/*.sh tests/*.sh bin/*

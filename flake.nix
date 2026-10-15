@@ -77,7 +77,7 @@
               git config --global commit.gpgsign false
               git config --global init.defaultBranch main
               cp -r ${./.} src && chmod -R u+w src && cd src
-              shellcheck -s sh hooks/*.sh tests/*.sh bin/*
+              shellcheck -s sh -o check-extra-masked-returns,check-set-e-suppressed,require-double-brackets,add-default-case,quote-safe-variables hooks/*.sh tests/*.sh bin/*
               shfmt -i 2 -d hooks/*.sh tests/*.sh bin/*
               sh tests/run.sh
               if [ -f tests/integration.sh ]; then sh tests/integration.sh ${mkGithooks pkgs}; fi
