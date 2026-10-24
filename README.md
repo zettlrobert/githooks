@@ -227,5 +227,5 @@ tests/     run.sh (fixtures, drift checks), integration.sh (end-to-end), commit-
 docs/      design.md: decisions and rejected alternatives
 ```
 
-CI (`.forgejo/workflows/check.yml`) runs `just check` and `just lint` on every pull request and every push to
-`main`. Decisions and rejected alternatives live in [`docs/design.md`](docs/design.md).
+CI (`.forgejo/workflows/check.yml`) runs `nix flake check` and `just lint` on every pull request and every push
+to `main`. Decisions and rejected alternatives live in [`docs/design.md`](docs/design.md).

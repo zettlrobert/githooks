@@ -1,5 +1,5 @@
 name: check
-# Runs `just check` (nix flake check: the hook fixtures, the drift checks and the end-to-end test against the
+# Runs `nix flake check` (what `just check` runs: the hook fixtures, the drift checks and the end-to-end test against the
 # built package) and `just lint` (this repo's own hooks on every file) on every PR and every push to main.
 # Runner, image and volumes follow homelab's .forgejo/workflows/check.yml: the /nix store is a named volume
 # seeded from the image, so steady-state runs download nothing. The volume follows the image tag because the
@@ -23,7 +23,9 @@ jobs:
       XDG_CACHE_HOME: /cache/xdg   # ~/.cache/nix (eval + fetcher cache) survives between runs
     steps:
       - uses: actions/checkout@v4
-      - name: just check
-        run: nix develop --command just check
+      # not inside `nix develop`: the image builds without a sandbox, so the dev shell's TMPDIR and stdenv
+      # variables leak into the test derivation and it fails in unpackPhase ("$src or $srcs should point to ...")
+      - name: nix flake check
+        run: nix flake check -L
       - name: just lint
         run: nix develop --command just lint && git diff --exit-code HEAD   # a formatter change fails the run

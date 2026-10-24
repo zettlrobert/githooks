@@ -208,8 +208,10 @@ link to `docs/design.md`. Moving the source to the Forgejo instance later is one
   53 checks, run by `just test` and by `nix flake check` (sandbox: git in `nativeBuildInputs`,
   `HOME=$TMPDIR`, no network). `just lint` and the flake check read the optional shellcheck checks from
   `configs/shellcheckrc` via `--rcfile`; only the shell job keeps `-o`, so a repo `.shellcheckrc` still wins.
-- CI: `.forgejo/workflows/check.yml` runs `just check` and `just lint` plus `git diff --exit-code HEAD` on the
-  homelab runner, with the same image and store volume as homelab's `check.yml`.
+- CI: `.forgejo/workflows/check.yml` runs `nix flake check` and `just lint` plus `git diff --exit-code HEAD` on
+  the homelab runner, with the same image and store volume as homelab's `check.yml`. The flake check runs
+  outside `nix develop`: the image (Nix 2.28) builds with `sandbox = false`, so the dev shell's environment
+  leaks into the test derivation, which then fails in `unpackPhase`. Reproduced in the image on 2026-10-24.
 - `tests/integration.sh`: 21 end-to-end checks in a consumer repo against the built package, also run by
   `nix flake check`. Besides the basics it proves each shared rule change of 2026-10-15 blocks or passes as
   intended: an optional shellcheck check (SC2312), a yaml octal, an unpinned `apk add` accepted while a
