@@ -1,0 +1,29 @@
+name: check
+# Runs `just check` (nix flake check: the hook fixtures, the drift checks and the end-to-end test against the
+# built package) and `just lint` (this repo's own hooks on every file) on every PR and every push to main.
+# Runner, image and volumes follow homelab's .forgejo/workflows/check.yml: the /nix store is a named volume
+# seeded from the image, so steady-state runs download nothing. The volume follows the image tag because the
+# store is the image's content: BUMP BOTH LINES TOGETHER. The first run builds the yamllint override once.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: docker
+    container:
+      image: 192.168.0.200:30130/zettlrobert/ci-nix:20261011
+      volumes:
+        - nix-store-20261011:/nix
+        - ci-cache:/cache
+    env:
+      XDG_CACHE_HOME: /cache/xdg   # ~/.cache/nix (eval + fetcher cache) survives between runs
+    steps:
+      - uses: actions/checkout@v4
+      - name: just check
+        run: nix develop --command just check
+      - name: just lint
+        run: nix develop --command just lint && git diff --exit-code HEAD   # a formatter change fails the run
