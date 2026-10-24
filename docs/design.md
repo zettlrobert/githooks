@@ -56,7 +56,8 @@ configs/actionlint.yaml          # self-hosted-runner labels: [docker], else "la
 configs/gitleaks.toml            # default rules plus the pass/placeholder allowlist
 configs/biome.json               # format + recommended lint
 configs/taplo.toml
-tests/run.sh, tests/commit-msg/  # fixture tests for the two scripts (49 checks, done); extends/merge lab proven
+tests/run.sh, tests/commit-msg/  # fixture tests for the two scripts plus config drift checks (53 checks)
+.forgejo/workflows/check.yml     # CI: just check and just lint on every PR and push to main
 docs/design.md                   # this file
 README.md                        # the project README, see outline below
 ```
@@ -149,7 +150,8 @@ standard tool when the script knows one (go: golangci-lint, rust: rustfmt and cl
 terraform: tofu fmt, dockerfile already covered). Always exits 0; `--summary` prints one line, which `just lint`
 shows at the end. It is a report for the developer and the maintenance signal for this package: a type that
 keeps showing up uncovered across repos gets a job and a config here. About 40 lines of sh; the known-types
-table lives in the script, the base config stays the only list of what runs.
+table lives in the script, the base config stays the only list of what runs, and `tests/run.sh` fails when the
+script's `base` and `optin` types differ from the extensions in the job globs.
 
 ## Conventions (the two scripts)
 
@@ -201,9 +203,14 @@ link to `docs/design.md`. Moving the source to the Forgejo instance later is one
 
 ## Verification
 
-- `tests/run.sh` (done): 36 commit-msg fixtures and 13 pre-push cases, 49 checks, run by `just test` and
-  by `nix flake check` (sandbox: git in `nativeBuildInputs`, `HOME=$TMPDIR`, no network).
-- `tests/integration.sh`: 18 end-to-end checks in a consumer repo against the built package, also run by
+- `tests/run.sh`: 36 commit-msg fixtures, 13 pre-push cases and 4 drift checks (shellcheckrc vs the shell
+  job's `-o` list, coverage types vs the base and opt-in globs, `.editorconfig` vs the shipped template),
+  53 checks, run by `just test` and by `nix flake check` (sandbox: git in `nativeBuildInputs`,
+  `HOME=$TMPDIR`, no network). `just lint` and the flake check read the optional shellcheck checks from
+  `configs/shellcheckrc` via `--rcfile`; only the shell job keeps `-o`, so a repo `.shellcheckrc` still wins.
+- CI: `.forgejo/workflows/check.yml` runs `just check` and `just lint` plus `git diff --exit-code HEAD` on the
+  homelab runner, with the same image and store volume as homelab's `check.yml`.
+- `tests/integration.sh`: 21 end-to-end checks in a consumer repo against the built package, also run by
   `nix flake check`. Besides the basics it proves each shared rule change of 2026-10-15 blocks or passes as
   intended: an optional shellcheck check (SC2312), a yaml octal, an unpinned `apk add` accepted while a
   hadolint warning blocks, sibling duplicate headings, and a repo `.markdownlint-cli2.yaml` relaxing MD013.
