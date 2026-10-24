@@ -2,7 +2,7 @@
 # githooks-coverage: which tracked file types are covered by the shared hooks. Advisory, always exits 0.
 #   githooks-coverage            table: extension, files, status (base | opt-in | uncovered: <tool>)
 #   githooks-coverage --summary  one line: "<n> uncovered types: ext (files) ..." or "all file types covered"
-# Keep the known-types table in sync with lefthook.yml and jobs/*.yml in github:zettlrobert/githooks.
+# base and optin must match the globs in lefthook.yml and jobs/*.yml; tests/run.sh fails when they drift.
 # Files without an extension (Caddyfile, justfile, LICENSE, .gitignore) are not listed; Dockerfile,
 # Dockerfile.* and *.Dockerfile count as dockerfile.
 export LC_ALL=C

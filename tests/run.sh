@@ -63,6 +63,21 @@ pp 0 "HEAD pushed to a valid branch" "HEAD $FINE refs/heads/junk/zz $Z"
 job=$(sed -n 's/.*shellcheck -o \([a-z,-]*\).*/\1/p' "$HERE/../lefthook.yml" | tr ',' '\n' | sort)
 rc=$(sed -n 's/^enable=//p' "$HERE/../configs/shellcheckrc" | sort)
 if [ -n "$job" ] && [ "$job" = "$rc" ]; then ok "shellcheckrc matches the shell job's -o list"; else nok "shellcheckrc matches the shell job's -o list"; fi
+# githooks-coverage's base and opt-in types must be exactly the extensions the job globs match ("*.ext" and
+# "*.{a,b}"); the workflow-path glob is not a type, the Dockerfile job counts as "dockerfile"
+globs() { sed -n 's/^ *glob: "\*\.\(.*\)"$/\1/p' "$@" | tr -d '{}' | tr ',' '\n'; }
+types() { sed -n "s/^$1='\(.*\)'$/\1/p" "$HERE/../bin/githooks-coverage" | tr ' ' '\n' | sort; }
+base=$({
+  globs "$HERE/../lefthook.yml"
+  if grep -q '^ *- name: dockerfile$' "$HERE/../lefthook.yml"; then echo dockerfile; fi
+} | sort)
+optin=$(globs "$HERE"/../jobs/*.yml | sort)
+cov_base=$(types base)
+cov_optin=$(types optin)
+if [ -n "$base" ] && [ "$base" = "$cov_base" ]; then ok "coverage base types match lefthook.yml"; else nok "coverage base types match lefthook.yml"; fi
+if [ -n "$optin" ] && [ "$optin" = "$cov_optin" ]; then ok "coverage opt-in types match jobs/*.yml"; else nok "coverage opt-in types match jobs/*.yml"; fi
+# this repo dogfoods the editorconfig template it ships
+if cmp -s "$HERE/../.editorconfig" "$HERE/../configs/editorconfig"; then ok ".editorconfig matches configs/editorconfig"; else nok ".editorconfig matches configs/editorconfig"; fi
 
 printf '%s of %s checks passed\n' "$((n - fail))" "$n"
 [ "$fail" -eq 0 ]
