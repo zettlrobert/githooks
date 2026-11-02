@@ -46,7 +46,9 @@
           taplo
           hadolint
           actionlint
+          opentofu
           biome
+          prettier
           gitleaks
         ];
 

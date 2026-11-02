@@ -1,0 +1,2 @@
+# Files the shared yaml job must not format. pnpm rewrites its own lockfile on every install.
+pnpm-lock.yaml
