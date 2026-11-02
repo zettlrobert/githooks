@@ -4,8 +4,8 @@
 # consuming repo root, which is where git runs hooks. Formatters write and re-stage (stage_fixed), checkers
 # block. A job whose glob matches no staged file is skipped. README: how to opt out of a job or add one.
 min_version: 2.0.0
-assert_lefthook_installed: true   # a missing lefthook fails the commit instead of silently passing it
-rc: .githooks/share/githooks/lefthookrc   # puts the package bin dir on PATH for GUI git and plain terminals
+assert_lefthook_installed: true # a missing lefthook fails the commit instead of silently passing it
+rc: .githooks/share/githooks/lefthookrc # puts the package bin dir on PATH for GUI git and plain terminals
 
 pre-commit:
   parallel: true
@@ -32,7 +32,13 @@ pre-commit:
       stage_fixed: true
     - name: yaml
       glob: "*.{yml,yaml}"
-      run: yamllint -c .githooks/share/githooks/yamllint.yaml {staged_files}
+      # both in one chain, so the check sees the formatted file under parallel: true
+      run: >-
+        prettier --write --no-error-on-unmatched-pattern --config .githooks/share/githooks/prettier.json
+        --ignore-path .githooks/share/githooks/prettierignore --ignore-path .gitignore --ignore-path .prettierignore
+        {staged_files}
+        && yamllint -c .githooks/share/githooks/yamllint.yaml {staged_files}
+      stage_fixed: true
     - name: markdown
       glob: "*.md"
       run: markdownlint-cli2 --fix --config .githooks/share/githooks/markdownlint.yaml {staged_files}
