@@ -235,6 +235,28 @@ printf 'FROM alpine:3.20\nRUN apk add --no-cache curl\n' >Containerfile && git a
 expect "a clean Containerfile is accepted" git commit -q -m "feat: add a containerfile"
 git rm -q -f Containerfile && git commit -q -m "chore: drop the containerfile"
 
+bad_css='.a{color:red;content:"x"}'
+printf '%s\n' "$bad_css" >s.scss && git add s.scss
+expect "stylesheets commit without the opt-in" git commit -q -m "feat: add a stylesheet"
+committed "without the opt-in the stylesheet is untouched" HEAD:s.scss "$bad_css"
+
+sed -i.bak 's#^extends: .*#extends: [".githooks/share/githooks/lefthook.yml", ".githooks/share/githooks/jobs/prettier.yml"]#' lefthook.yml
+rm -f lefthook.yml.bak && git add lefthook.yml && git commit -q -m "chore: opt in to prettier"
+echo >>s.scss && printf '%s\n' "$bad_css" >s.css && git add s.scss s.css
+expect "bad stylesheets are formatted and committed" git commit -q -m "feat: change the stylesheets"
+want=$(printf ".a {\n  color: red;\n  content: 'x';\n}")
+committed "the committed scss is formatted, single quotes, 2 spaces" HEAD:s.scss "$want"
+committed "the committed css is formatted too" HEAD:s.css "$want"
+printf '%s\n' "$bad_css" >u.scss
+echo more >>c.md && git add c.md
+logs "an unrelated commit skips the prettier job" 'prettier.*skip' git commit -q -m "docs: extend title once more"
+got=$(cat u.scss)
+same "and leaves an unstaged stylesheet alone" "$got" "$bad_css"
+rm -f u.scss
+git rm -q -f s.scss s.css
+sed -i.bak 's#^extends: .*#extends: [".githooks/share/githooks/lefthook.yml"]#' lefthook.yml
+rm -f lefthook.yml.bak && git add lefthook.yml && git commit -q -m "chore: opt out of prettier"
+
 expect "all-files run" env PATH="$PKG/bin:$PATH" "$PKG/bin/lefthook" run pre-commit --all-files --no-stage-fixed
 
 # editor and terminal: shellcheck reads the shipped shellcheckrc through ~/.config, a repo .shellcheckrc wins

@@ -94,6 +94,8 @@ cov "tfvars is base" sub/v.tfvars base tfvars
 for f in Containerfile sub/Containerfile Containerfile.dev app.Containerfile Dockerfile app.Dockerfile; do
   cov "$f counts as dockerfile" "$f" base dockerfile
 done
+cov "scss names the prettier job" a.scss "opt-in (if the repo extends jobs/prettier.yml)" scss
+cov "ts names the biome job" a.ts "opt-in (if the repo extends jobs/biome.yml)" ts
 
 printf '%s of %s checks passed\n' "$((n - fail))" "$n"
 [ "$fail" -eq 0 ]

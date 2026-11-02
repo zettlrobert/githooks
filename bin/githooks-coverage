@@ -7,12 +7,12 @@
 # Dockerfile.*, *.Dockerfile and the same three Containerfile forms count as dockerfile.
 export LC_ALL=C
 base='sh py nix yml yaml md toml tf tfvars dockerfile'
-optin='js mjs cjs ts tsx json jsonc'
+optin='js mjs cjs ts tsx json jsonc css scss'
 suggest() {
   case $1 in
   go) echo golangci-lint ;;
   rs) echo "rustfmt, clippy" ;;
-  css | scss | html | vue | svelte) echo "biome (jobs/biome.yml) or prettier" ;;
+  html | vue | svelte) echo "biome (jobs/biome.yml) or prettier" ;;
   lua) echo stylua ;;
   kt | java) echo ktlint ;;
   *) echo "none known" ;;
@@ -51,7 +51,10 @@ while read -r count ext; do
   if has "$ext" "$base"; then
     status="base"
   elif has "$ext" "$optin"; then
-    status="opt-in (if the repo extends jobs/biome.yml)"
+    case $ext in
+    css | scss) status="opt-in (if the repo extends jobs/prettier.yml)" ;;
+    *) status="opt-in (if the repo extends jobs/biome.yml)" ;;
+    esac
   else
     status="uncovered: $(suggest "$ext")"
     n=$((n + 1))

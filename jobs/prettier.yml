@@ -1,0 +1,11 @@
+# Opt-in: a repo with stylesheets and no formatter of its own adds this file to its extends list:
+#   extends: [".githooks/share/githooks/lefthook.yml", ".githooks/share/githooks/jobs/prettier.yml"]
+# Not in the base: a repo with its own Prettier setup keeps it, and two formatters would fight.
+pre-commit:
+  jobs:
+    - name: prettier
+      glob: "*.{css,scss}"
+      run: >-
+        prettier --write --no-error-on-unmatched-pattern --config .githooks/share/githooks/prettier.json
+        {staged_files}
+      stage_fixed: true
