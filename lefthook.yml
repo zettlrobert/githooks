@@ -58,6 +58,9 @@ pre-commit:
         - "{Dockerfile,Dockerfile.*}"
         - "**/{Dockerfile,Dockerfile.*}"
         - "*.Dockerfile"
+        - "{Containerfile,Containerfile.*}"
+        - "**/{Containerfile,Containerfile.*}"
+        - "*.Containerfile"
       run: hadolint -c .githooks/share/githooks/hadolint.yaml {staged_files}
     - name: actions
       glob: "{.forgejo,.github}/workflows/*.{yml,yaml}"

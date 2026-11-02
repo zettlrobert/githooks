@@ -224,6 +224,17 @@ same "and leaves an unstaged .tf file alone" "$got" "a=2"
 rm -f u.tf
 git rm -q -r -f m.tf sub && git commit -q -m "chore: drop terraform"
 
+# the local copy of what blckbrd-inventory carries today, plus the variants it missed
+for f in Containerfile sub/Containerfile Containerfile.dev sub/Containerfile.dev app.Containerfile; do
+  mkdir -p sub && printf 'FROM alpine:3.20\nRUN cd /tmp && apk add --no-cache curl\n' >"$f" && git add "$f"
+  refuse "hadolint blocks $f" DL3003 git commit -q -m "feat: add a containerfile"
+  git reset -q "$f" && rm -f "$f"
+done
+rmdir sub
+printf 'FROM alpine:3.20\nRUN apk add --no-cache curl\n' >Containerfile && git add Containerfile
+expect "a clean Containerfile is accepted" git commit -q -m "feat: add a containerfile"
+git rm -q -f Containerfile && git commit -q -m "chore: drop the containerfile"
+
 expect "all-files run" env PATH="$PKG/bin:$PATH" "$PKG/bin/lefthook" run pre-commit --all-files --no-stage-fixed
 
 # editor and terminal: shellcheck reads the shipped shellcheckrc through ~/.config, a repo .shellcheckrc wins

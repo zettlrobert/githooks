@@ -4,7 +4,7 @@
 #   githooks-coverage --summary  one line: "<n> uncovered types: ext (files) ..." or "all file types covered"
 # base and optin must match the globs in lefthook.yml and jobs/*.yml; tests/run.sh fails when they drift.
 # Files without an extension (Caddyfile, justfile, LICENSE, .gitignore) are not listed; Dockerfile,
-# Dockerfile.* and *.Dockerfile count as dockerfile.
+# Dockerfile.*, *.Dockerfile and the same three Containerfile forms count as dockerfile.
 export LC_ALL=C
 base='sh py nix yml yaml md toml tf tfvars dockerfile'
 optin='js mjs cjs ts tsx json jsonc'
@@ -39,6 +39,7 @@ fi
 # -z: git quotes non-ASCII names and names with quotes or control characters ("\303\244.md"), which would
 # hide the extension; NUL-separated output is never quoted
 counts=$(git ls-files -z | tr '\0' '\n' | sed -n -e 's#.*/##' -e 's/^[Dd]ockerfile\(\..*\)\{0,1\}$/dockerfile/p' \
+  -e 's/^[Cc]ontainerfile\(\..*\)\{0,1\}$/dockerfile/p' -e 's/^.\{1,\}\.[Cc]ontainerfile$/dockerfile/p' \
   -e 's/^.\{1,\}\.\([A-Za-z0-9]\{1,\}\)$/\1/p' | tr '[:upper:]' '[:lower:]' | sort | uniq -c | sort -rn)
 uncovered=''
 n=0

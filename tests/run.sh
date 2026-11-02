@@ -91,6 +91,9 @@ cov() { # $1 label, $2 path, $3 expected status prefix, $4 the table row
 }
 cov "tf is base" m.tf base tf
 cov "tfvars is base" sub/v.tfvars base tfvars
+for f in Containerfile sub/Containerfile Containerfile.dev app.Containerfile Dockerfile app.Dockerfile; do
+  cov "$f counts as dockerfile" "$f" base dockerfile
+done
 
 printf '%s of %s checks passed\n' "$((n - fail))" "$n"
 [ "$fail" -eq 0 ]
