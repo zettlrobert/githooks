@@ -6,14 +6,13 @@
 # Files without an extension (Caddyfile, justfile, LICENSE, .gitignore) are not listed; Dockerfile,
 # Dockerfile.* and *.Dockerfile count as dockerfile.
 export LC_ALL=C
-base='sh py nix yml yaml md toml dockerfile'
+base='sh py nix yml yaml md toml tf tfvars dockerfile'
 optin='js mjs cjs ts tsx json jsonc'
 suggest() {
   case $1 in
   go) echo golangci-lint ;;
   rs) echo "rustfmt, clippy" ;;
   css | scss | html | vue | svelte) echo "biome (jobs/biome.yml) or prettier" ;;
-  tf | hcl) echo "tofu fmt" ;;
   lua) echo stylua ;;
   kt | java) echo ktlint ;;
   *) echo "none known" ;;

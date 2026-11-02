@@ -49,6 +49,10 @@ pre-commit:
         RUST_LOG=error taplo fmt --config .githooks/share/githooks/taplo.toml {staged_files}
         && RUST_LOG=error taplo check --config .githooks/share/githooks/taplo.toml {staged_files}
       stage_fixed: true
+    - name: terraform
+      glob: "*.{tf,tfvars}"
+      run: tofu fmt {staged_files}
+      stage_fixed: true
     - name: dockerfile
       glob:
         - "{Dockerfile,Dockerfile.*}"

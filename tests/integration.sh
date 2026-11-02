@@ -211,6 +211,19 @@ got=$(cat u.yml)
 same "and leaves an unstaged yaml file alone" "$got" "a:   1"
 rm -f u.yml
 
+mkdir sub && printf 'resource "a" "b" {\n  x=1\n}\n' >m.tf && printf 'a=1\n' >sub/v.tfvars && git add m.tf sub/v.tfvars
+expect "bad terraform is formatted and committed" git commit -q -m "feat: add terraform"
+want=$(printf 'resource "a" "b" {\n  x = 1\n}')
+committed "the committed .tf is the formatted one" HEAD:m.tf "$want"
+committed "the committed .tfvars is the formatted one" HEAD:sub/v.tfvars "a = 1"
+printf 'a=2\n' >u.tf
+echo more >>c.md && git add c.md
+logs "an unrelated commit skips the terraform job" 'terraform.*skip' git commit -q -m "docs: extend title again"
+got=$(cat u.tf)
+same "and leaves an unstaged .tf file alone" "$got" "a=2"
+rm -f u.tf
+git rm -q -r -f m.tf sub && git commit -q -m "chore: drop terraform"
+
 expect "all-files run" env PATH="$PKG/bin:$PATH" "$PKG/bin/lefthook" run pre-commit --all-files --no-stage-fixed
 
 # editor and terminal: shellcheck reads the shipped shellcheckrc through ~/.config, a repo .shellcheckrc wins

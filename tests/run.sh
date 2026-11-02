@@ -79,5 +79,18 @@ if [ -n "$optin" ] && [ "$optin" = "$cov_optin" ]; then ok "coverage opt-in type
 # this repo dogfoods the editorconfig template it ships
 if cmp -s "$HERE/../.editorconfig" "$HERE/../configs/editorconfig"; then ok ".editorconfig matches configs/editorconfig"; else nok ".editorconfig matches configs/editorconfig"; fi
 
+# --- githooks-coverage --------------------------------------------------------
+# the status a real file gets, not only the type lists above
+git init -q "$TMP/cov"
+cd "$TMP/cov" || exit 1
+cov() { # $1 label, $2 path, $3 expected status prefix, $4 the table row
+  mkdir -p "$(dirname "$2")" && : >"$2" && git add "$2"
+  row=$(sh "$HERE/../bin/githooks-coverage")
+  ext=$(printf '%s\n' "$row" | sed -n "s/^$4  *[0-9]*  *//p")
+  case $ext in "$3"*) ok "coverage $1" ;; *) nok "coverage $1 (got '$ext')" ;; esac
+}
+cov "tf is base" m.tf base tf
+cov "tfvars is base" sub/v.tfvars base tfvars
+
 printf '%s of %s checks passed\n' "$((n - fail))" "$n"
 [ "$fail" -eq 0 ]
