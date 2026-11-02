@@ -13,13 +13,15 @@ One package (`packages.<system>.default`), used from a dev shell or a nix profil
 | Part                                         | What it is                                                                  |
 | -------------------------------------------- | --------------------------------------------------------------------------- |
 | `bin/lefthook`                               | the hook runner                                                             |
-| `bin/` linters                               | shellcheck, shfmt, ruff, nixfmt, deadnix, statix, yamllint, markdownlint-cli2, taplo, hadolint, actionlint, gitleaks, biome |
+| `bin/` linters                               | shellcheck, shfmt, ruff, nixfmt, deadnix, statix, yamllint, markdownlint-cli2, taplo, hadolint, actionlint, gitleaks, biome, prettier, tofu |
 | `bin/githooks-install`                       | links a repo to this package and installs the git hook stubs               |
 | `bin/githooks-coverage`                      | lists the repo's file types and flags those no job checks                   |
 | `share/githooks/lefthook.yml`                | the shared base config every repo extends                                   |
 | `share/githooks/jobs/biome.yml`              | opt-in JavaScript, TypeScript and JSON job                                  |
+| `share/githooks/jobs/prettier.yml`           | opt-in CSS and SCSS job                                                     |
 | `share/githooks/commit-msg.sh`, `pre-push.sh` | the commit message and branch convention checks                            |
 | `share/githooks/*.yaml`, `*.toml`, `*.json`  | the linter rules, one file per tool, from [`configs/`](configs/)            |
+| `share/githooks/prettierignore`              | files the `yaml` job never formats: `pnpm-lock.yaml`                        |
 | `share/githooks/shellcheckrc`, `editorconfig` | defaults for the editor and the terminal                                   |
 
 ## Lefthook in a minute
@@ -96,13 +98,16 @@ On `pre-commit`, in parallel, on the staged files:
 | `*.sh`                                        | shfmt, shellcheck (1)   | fix, check |
 | `*.py`                                        | ruff format, ruff check | fix, check |
 | `*.nix`                                       | nixfmt, deadnix, statix | fix, check |
-| `*.yml`, `*.yaml`                             | yamllint                | check      |
+| `*.yml`, `*.yaml`                             | prettier, yamllint      | fix, check |
 | `*.md`                                        | markdownlint-cli2       | fix, check |
 | `*.toml`                                      | taplo                   | fix, check |
+| `*.tf`, `*.tfvars`                            | tofu fmt                | fix        |
 | `Dockerfile`, `Dockerfile.*`, `*.Dockerfile`  | hadolint                | check      |
+| `Containerfile`, `Containerfile.*`, `*.Containerfile` | hadolint        | check      |
 | `.forgejo/workflows/*`, `.github/workflows/*` | actionlint              | check      |
 | every staged change                           | gitleaks                | check      |
 | `*.js`, `*.ts`, `*.json` and friends          | biome, opt-in           | fix, check |
+| `*.css`, `*.scss`                             | prettier, opt-in        | fix        |
 
 (1) Plus the optional checks that catch bugs: masked exit codes, `set -e` lost in conditions, `[ ]` in bash,
 `case` without a default, unquoted `$?`.
@@ -124,13 +129,13 @@ Output in this repo:
 ```text
 extension     files  status
 msg              36  uncovered: none known
+yml               4  base
 yaml              4  base
 sh                4  base
-yml               3  base
 toml              2  base
 md                2  base
+json              2  opt-in (if the repo extends jobs/biome.yml)
 nix               1  base
-json              1  opt-in (if the repo extends jobs/biome.yml)
 in                1  uncovered: none known
 githooks-coverage: 2 uncovered types: msg (36) in (1)
 ```
@@ -152,12 +157,13 @@ forge's web UI.
 
 ## Configure
 
-Two tools read a repo file on top of the shared rules, so one rule can change without touching the job:
+Three tools read a repo file on top of the shared rules, so one rule can change without touching the job:
 
 | Tool         | Repo file                 | Example                                         |
 | ------------ | ------------------------- | ----------------------------------------------- |
 | markdownlint | `.markdownlint-cli2.yaml` | `config: { MD013: false }` for a notes repo     |
 | shellcheck   | `.shellcheckrc`           | `disable=SC2312`                                |
+| prettier     | `.prettierignore`         | a generated file the `yaml` job must leave alone |
 
 Use `.markdownlint-cli2.yaml`, not `.markdownlint.yaml`: the second replaces the shared rules instead of
 merging with them. Either file also works in a subdirectory and applies only there.
@@ -174,8 +180,13 @@ pre-commit:
       run: yamllint -c .yamllint.yaml {staged_files}
 ```
 
-Opt in to biome by adding `.githooks/share/githooks/jobs/biome.yml` to the `extends` list. A repo-specific job
-(such as `docker compose config -q`) goes in the repo's `lefthook.yml` next to the guard jobs.
+Opt in to biome or prettier by adding `.githooks/share/githooks/jobs/biome.yml` or
+`.githooks/share/githooks/jobs/prettier.yml` to the `extends` list. Skip the prettier job in a repo with its own
+Prettier setup: the job passes `--config`, so the repo's `printWidth` and other options are ignored. A repo-specific
+job (such as `docker compose config -q`) goes in the repo's `lefthook.yml` next to the guard jobs.
+
+The shared Prettier rules are 2 spaces, 120 columns and single quotes, with double quotes for YAML. `tofu fmt` has no
+config: its style is fixed.
 
 ### Same rules in the editor and terminal
 
@@ -189,8 +200,8 @@ ln -s ~/.nix-profile/share/githooks/hadolint.yaml ~/.config/hadolint.yaml
 ln -s ~/.nix-profile/share/githooks/shellcheckrc ~/.config/shellcheckrc
 ```
 
-markdownlint-cli2 has no user config: point the editor at
-`--config ~/.nix-profile/share/githooks/markdownlint.yaml`.
+markdownlint-cli2 and prettier have no user config: point the editor at
+`--config ~/.nix-profile/share/githooks/markdownlint.yaml` and `--config ~/.nix-profile/share/githooks/prettier.json`.
 
 ## Update
 

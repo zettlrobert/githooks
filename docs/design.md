@@ -25,6 +25,12 @@ network at hook time. Tool versions pinned through nix, not through a second ver
 | One tool set for all languages, jobs filtered by `glob` | per-language sub-packages chosen per repo | A job whose glob matches no staged file is skipped, so a repo never declares which linters it needs. Cost is disk, once, in the store. Repos can still disable a base job by name with `skip: true`. |
 | Biome is opt-in: shipped as `jobs/biome.yml`, not in the base | biome in the base with a per-repo opt-out | The idiomatic choice for JavaScript repos is the toolchain the repo already declares (eslint, prettier). A repo that wants biome adds the file to its `extends` list. The binary stays in the package. |
 | Keep `junk` and `stash` as distinct temporary types | one `wip` type | Same enforcement (pre-push keeps both off `main`), different intent: `junk` is dirty work on a branch to be squashed or rebased away before merge; `stash` is a WIP snapshot committed instead of `git stash`, so it survives branch switches and can be pushed to a backup branch. Git's own stash never runs the commit-msg hook, so the two never collide. `wip` stays a branch prefix only. |
+| Prettier formats YAML, in the base `yaml` job before yamllint | yamlfmt, as first planned | yamlfmt's `retain_line_breaks` options rewrite blank lines to a `#magic___^_^___line` comment before parsing, and the marker reaches the data. Tested on yamlfmt 0.21.0 on 14 inputs: 6 values changed with `retain_line_breaks_single`, 5 with `retain_line_breaks` (quoted multi-line strings, block scalars with trailing spaces, `\|+` chomping), and doubled blank lines inside a `\|` block collapsed. Without retention every blank line goes. It also always strips a leading `---` (upstream #333), and `trim_trailing_whitespace` turns a `\|` scalar at end of file into `\|-`. Prettier passed all 14, keeps `---` and comments, and was already in the package for CSS. On homelab's 40 YAML files it changed no parsed value. |
+| Prettier YAML double quotes, `pnpm-lock.yaml` ignored through a shipped `prettierignore` | one setting for all file types; a lefthook `exclude` | `singleQuote` would rewrite compose files, whose idiom is `"..."`. pnpm regenerates its lockfile, so formatting it churns on every install. A lefthook `exclude` would also take the file away from yamllint. A repo `.prettierignore` still applies. |
+| Parallel read of YAML during a format is accepted | `parallel: false`; a sequential group | `actions` and homelab's `compose` job read files the `yaml` job may be writing. Only an unformatted file is exposed, and the worst case is a failed commit that passes on retry. A group would stop the documented `name: yaml` override, and `parallel: false` slows every commit. |
+| `tofu fmt` for `*.tf`, `*.tfvars`, in the base | terraform (unfree); an opt-in job | OpenTofu is free, needs no init and no network, and a job with no matching file is skipped. `core-packages` also lists opentofu; with `follows` both are one store path, so `buildEnv` sees no collision. |
+| Containerfiles run through the `dockerfile` job | a separate job | Same tool and same config. lefthook globs are case-insensitive and `*` crosses `/`, so `src/containerfile.ts` would reach hadolint, as a `dockerfile.ts` already would. No consumer has such a file. |
+| CSS and SCSS are opt-in, `jobs/prettier.yml` | in the base | holy-rolly-website runs its own Prettier at `printWidth` 80. `--config` overrides that, and its `prettier --check .` then fails, so it must not opt in. |
 | markdownlint-cli2 | rumdl | The standard tool and config format; rumdl is faster but at 0.2.x. Swap later if commit time suffers. |
 | nixfmt (RFC 166) | alejandra, nixpkgs-fmt | The formatter nixpkgs enforces. nixpkgs-fmt is archived. |
 | gitleaks in the hook, nothing else for secrets | trufflehog | MIT, static, offline; trufflehog verifies secrets over the network and is AGPL. |
@@ -43,6 +49,7 @@ network at hook time. Tool versions pinned through nix, not through a second ver
 flake.nix                        # packages.<system>.default (symlinkJoin + postBuild), devShell, checks
 lefthook.yml                     # shared base: hooks, jobs, globs, rc, assert_lefthook_installed
 jobs/biome.yml                   # opt-in job file: a repo adds it to its extends list
+jobs/prettier.yml                # opt-in CSS and SCSS job
 bin/githooks-install.in          # link .githooks as a GC root, lefthook install; skips in CI; @out@ substituted
 bin/githooks-coverage            # advisory: tracked file types vs base and opt-in jobs, names the tool for uncovered ones
 hooks/commit-msg.sh              # conventions, see below (done)
@@ -55,8 +62,10 @@ configs/shellcheckrc             # the shell job's optional checks, for ~/.confi
 configs/actionlint.yaml          # self-hosted-runner labels: [docker], else "label docker is unknown"
 configs/gitleaks.toml            # default rules plus the pass/placeholder allowlist
 configs/biome.json               # format + recommended lint
+configs/prettier.json            # 2 spaces, 120 columns, single quotes, double quotes for YAML
+configs/prettierignore           # what the yaml job never formats: pnpm-lock.yaml
 configs/taplo.toml
-tests/run.sh, tests/commit-msg/  # fixture tests for the two scripts plus config drift checks (53 checks)
+tests/run.sh, tests/commit-msg/  # fixture tests for the two scripts plus config drift checks (63 checks)
 .forgejo/workflows/check.yml     # CI: just check and just lint on every PR and push to main
 docs/design.md                   # this file
 README.md                        # the project README, see outline below
@@ -66,7 +75,7 @@ Installed as `$out/bin/*` (lefthook, every linter, `githooks-install`) and `$out
 scripts, the base `lefthook.yml`, the generated `lefthookrc` with `PATH=$out/bin:$PATH`).
 
 Tool set (nixpkgs pin at build): lefthook, shellcheck, shfmt, ruff, nixfmt, statix, deadnix, yamllint,
-markdownlint-cli2, taplo, hadolint, actionlint, biome, gitleaks. No git, no coreutils (see Decisions).
+markdownlint-cli2, taplo, hadolint, actionlint, opentofu, biome, prettier, gitleaks. No git, no coreutils (see Decisions).
 
 ## Per-repo contract
 
@@ -123,12 +132,14 @@ pre-commit, `parallel: true`, `{staged_files}` filtered by glob, formatters with
 | `*.sh` | `shfmt -w`, then `shellcheck -o <five optional checks>` (one piped group, so the check sees the formatted file under `parallel: true`) | fix, check |
 | `*.py` | `ruff format`, `ruff check --fix` | fix, check |
 | `*.nix` | `nixfmt`, `statix check`, `deadnix --fail` | fix, check, check |
-| `*.{yml,yaml}` | `yamllint -c <config>` | check |
+| `*.{yml,yaml}` | `prettier --write --config <config> --ignore-path <shipped, .gitignore, .prettierignore>`, then `yamllint -c <config>` | fix, check |
+| `*.{tf,tfvars}` | `tofu fmt` | fix |
 | `*.md` | `markdownlint-cli2 --fix --config <config>` | fix |
 | `*.toml` | `taplo fmt`, `taplo check` | fix, check |
-| `Dockerfile*`, `*.Dockerfile` | `hadolint` | check |
+| `Dockerfile*`, `*.Dockerfile`, `Containerfile*`, `*.Containerfile` | `hadolint` | check |
 | `.forgejo/workflows/*.y*ml`, `.github/workflows/*.y*ml` | `actionlint -config-file <config>` | check |
 | `*.{js,mjs,cjs,ts,tsx,json,jsonc}` | `biome check --write --config-path <config>` | fix, check; opt-in via `jobs/biome.yml`, not in the base |
+| `*.{css,scss}` | `prettier --write --config <config>` | fix; opt-in via `jobs/prettier.yml`, not in the base |
 | all staged | `gitleaks git --pre-commit --staged --no-banner -c <config>` | check |
 
 commit-msg: `hooks/commit-msg.sh`. pre-push: `hooks/pre-push.sh`. `assert_lefthook_installed: true` so a
@@ -203,19 +214,23 @@ link to `docs/design.md`. Moving the source to the Forgejo instance later is one
 
 ## Verification
 
-- `tests/run.sh`: 36 commit-msg fixtures, 13 pre-push cases and 4 drift checks (shellcheckrc vs the shell
-  job's `-o` list, coverage types vs the base and opt-in globs, `.editorconfig` vs the shipped template),
-  53 checks, run by `just test` and by `nix flake check` (sandbox: git in `nativeBuildInputs`,
+- `tests/run.sh`: 36 commit-msg fixtures, 13 pre-push cases, 10 `githooks-coverage` status checks and 4 drift
+  checks (shellcheckrc vs the shell job's `-o` list, coverage types vs the base and opt-in globs, `.editorconfig`
+  vs the shipped template),
+  63 checks, run by `just test` and by `nix flake check` (sandbox: git in `nativeBuildInputs`,
   `HOME=$TMPDIR`, no network). `just lint` and the flake check read the optional shellcheck checks from
   `configs/shellcheckrc` via `--rcfile`; only the shell job keeps `-o`, so a repo `.shellcheckrc` still wins.
 - CI: `.forgejo/workflows/check.yml` runs `nix flake check` and `just lint` plus `git diff --exit-code HEAD` on
   the homelab runner, with the same image and store volume as homelab's `check.yml`. The flake check runs
   outside `nix develop`: the image (Nix 2.28) builds with `sandbox = false`, so the dev shell's environment
   leaks into the test derivation, which then fails in `unpackPhase`. Reproduced in the image on 2026-10-24.
-- `tests/integration.sh`: 21 end-to-end checks in a consumer repo against the built package, also run by
+- `tests/integration.sh`: 59 end-to-end checks in a consumer repo against the built package, also run by
   `nix flake check`. Besides the basics it proves each shared rule change of 2026-10-15 blocks or passes as
   intended: an optional shellcheck check (SC2312), a yaml octal, an unpinned `apk add` accepted while a
-  hadolint warning blocks, sibling duplicate headings, and a repo `.markdownlint-cli2.yaml` relaxing MD013.
+  hadolint warning blocks, sibling duplicate headings, and a repo `.markdownlint-cli2.yaml` relaxing MD013. Each
+  formatter job proves a fix lands in the commit and an unrelated commit skips it; the YAML checks also cover empty
+  yamllint output, kept comments and `---`, unchanged scalar values, the lockfile, a blocked commit leaving the fix
+  unstaged in the worktree, and a partly staged file.
 - Lefthook behaviour proven in a scratch lab on 2026-10-11 (lefthook 2.1.14): relative `extends` resolves
   against the repo root from any subdirectory through a symlink outside the repo; `rc` from the extended file
   is sourced by the installed stub; jobs merge by name and `skip: true` disables a base job; `stage_fixed`
