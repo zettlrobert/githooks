@@ -45,7 +45,7 @@ logs() {
   shift 2
   if ! "$@" >"$LOG" 2>&1; then nok "$d"; elif grep -q "$pat" "$LOG"; then ok "$d"; else nok "$d (no '$pat')"; fi
 }
-# same <description> <a> <b>: two strings must be equal
+# same <description> <got> <want>: the actual value must equal the expected one; a failure prints both
 same() {
   printf 'want: %s\ngot:  %s\n' "$3" "$2" >"$LOG"
   if [ "$2" = "$3" ]; then ok "$1"; else nok "$1"; fi
