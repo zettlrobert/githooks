@@ -31,7 +31,7 @@
           pkgs.yamllint;
 
       # Every linter the base lefthook.yml and jobs/*.yml call. No git, no coreutils: hooks run from a git
-      # process that has both, and bin/git would collide with nix-profiles core.
+      # process that has both, and bin/git would collide with yggdrasil core.
       tools =
         pkgs: with pkgs; [
           lefthook
@@ -74,6 +74,10 @@
         };
     in
     {
+      # Build the package from any pkgs, so a NixOS host gets the tools from its own nixpkgs pin instead
+      # of this flake's: `inputs.githooks.lib.mkGithooks pkgs`.
+      lib = { inherit mkGithooks; };
+
       packages = forAll (pkgs: {
         default = mkGithooks pkgs;
       });

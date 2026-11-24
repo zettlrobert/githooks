@@ -79,6 +79,10 @@ LEFTHOOK=0 git commit ...             # skip the hooks once
 
 Without a flake: `nix profile add github:zettlrobert/githooks` once, then `githooks-install` in the repo.
 
+On a NixOS host, build it from the host's own nixpkgs so the tools match the rest of the system:
+`environment.systemPackages = [ (inputs.githooks.lib.mkGithooks pkgs) ];`. The `packages` output uses this
+flake's nixpkgs pin instead.
+
 Optional `justfile` recipe, also what CI runs inside `nix develop` (followed by `git diff --exit-code HEAD`, so
 an unformatted file fails the run):
 
