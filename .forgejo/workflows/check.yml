@@ -3,7 +3,7 @@ name: check
 # built package) and `just lint` (this repo's own hooks on every file) on every PR and every push to main.
 # Runner, image and volumes follow homelab's .forgejo/workflows/check.yml: the /nix store is a named volume
 # seeded from the image, so steady-state runs download nothing. The volume follows the image tag because the
-# store is the image's content: BUMP BOTH LINES TOGETHER. The first run builds the yamllint override once.
+# store is the image's content: BUMP BOTH LINES TOGETHER.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
