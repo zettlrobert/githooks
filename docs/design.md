@@ -224,13 +224,14 @@ link to `docs/design.md`. Moving the source to the Forgejo instance later is one
   the homelab runner, with the same image and store volume as homelab's `check.yml`. The flake check runs
   outside `nix develop`: the image (Nix 2.28) builds with `sandbox = false`, so the dev shell's environment
   leaks into the test derivation, which then fails in `unpackPhase`. Reproduced in the image on 2026-10-24.
-- `tests/integration.sh`: 59 end-to-end checks in a consumer repo against the built package, also run by
+- `tests/integration.sh`: 61 end-to-end checks in a consumer repo against the built package, also run by
   `nix flake check`. Besides the basics it proves each shared rule change of 2026-10-15 blocks or passes as
   intended: an optional shellcheck check (SC2312), a yaml octal, an unpinned `apk add` accepted while a
   hadolint warning blocks, sibling duplicate headings, and a repo `.markdownlint-cli2.yaml` relaxing MD013. Each
   formatter job proves a fix lands in the commit and an unrelated commit skips it; the YAML checks also cover empty
   yamllint output, kept comments and `---`, unchanged scalar values, the lockfile, a blocked commit leaving the fix
-  unstaged in the worktree, and a partly staged file.
+  unstaged in the worktree, and a partly staged file. The shipped `biome.json` must load on the packaged biome with
+  no migration notes and still run the recommended rules, so a nixpkgs bump that needs a config migration fails CI.
 - Lefthook behaviour proven in a scratch lab on 2026-10-11 (lefthook 2.1.14): relative `extends` resolves
   against the repo root from any subdirectory through a symlink outside the repo; `rc` from the extended file
   is sourced by the installed stub; jobs merge by name and `skip: true` disables a base job; `stage_fixed`

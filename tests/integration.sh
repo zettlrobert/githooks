@@ -257,6 +257,16 @@ git rm -q -f s.scss s.css
 sed -i.bak 's#^extends: .*#extends: [".githooks/share/githooks/lefthook.yml"]#' lefthook.yml
 rm -f lefthook.yml.bak && git add lefthook.yml && git commit -q -m "chore: opt out of prettier"
 
+# biome: the shipped config must load clean on the packaged biome. A nixpkgs bump that moves biome past the
+# $schema version, or deprecates a field, prints a deserialize diagnostic and fails here until biome.json is
+# migrated. `biome migrate` turns `recommended: true` into `preset: "none"` (2.6.8), so the rules are checked too.
+printf 'debugger;\n' >z.js
+biome_out=$("$PKG/bin/biome" lint --config-path "$PKG/share/githooks/biome.json" z.js 2>&1 || true)
+printf '%s\n' "$biome_out" >"$LOG"
+if printf '%s\n' "$biome_out" | grep -q deserialize; then nok "biome.json loads without migration notes"; else ok "biome.json loads without migration notes"; fi
+if printf '%s\n' "$biome_out" | grep -q noDebugger; then ok "biome runs the recommended rules"; else nok "biome runs the recommended rules"; fi
+rm -f z.js
+
 expect "all-files run" env PATH="$PKG/bin:$PATH" "$PKG/bin/lefthook" run pre-commit --all-files --no-stage-fixed
 
 # editor and terminal: shellcheck reads the shipped shellcheckrc through ~/.config, a repo .shellcheckrc wins
