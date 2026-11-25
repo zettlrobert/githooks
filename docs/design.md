@@ -66,6 +66,7 @@ configs/prettierignore           # what the yaml job never formats: pnpm-lock.ya
 configs/taplo.toml
 tests/run.sh, tests/commit-msg/  # fixture tests for the two scripts plus config drift checks (63 checks)
 .forgejo/workflows/check.yml     # CI: just check and just lint on every PR and push to main
+renovate.json                    # Renovate: weekly flake.lock refresh (the tool bump) and the workflow actions
 docs/design.md                   # this file
 README.md                        # the project README, see outline below
 ```

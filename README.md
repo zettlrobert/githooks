@@ -212,6 +212,11 @@ markdownlint-cli2 and prettier have no user config: point the editor at
 `nix flake update githooks && nix develop` in the repo, or `nix profile upgrade githooks` and
 `githooks-install` for the profile install.
 
+This repo's own tool versions move with `flake.lock`. Renovate (the homelab workflow) opens a weekly PR that
+refreshes it, and one per workflow action. By hand: `nix flake update && just check`. When the check fails on
+`biome.json loads without migration notes`, run `biome migrate --write --config-path configs/biome.json` and set
+`linter.rules.preset` back to `"recommended"`: the migration writes `"none"`, which turns every lint rule off.
+
 ## Troubleshooting
 
 | Symptom                                                    | Fix                                                             |

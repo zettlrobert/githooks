@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Run by the homelab Renovate workflow (homelab/.forgejo/workflows/renovate.yml).",
+    "flake.lock pins every tool in the package, so the weekly lock file maintenance PR is the tool bump. Do not merge it before the check workflow is green: tests/integration.sh fails when the new biome needs a configs/biome.json migration (schema version, deprecated fields). Run biome migrate on the branch, then check that rules.preset is still \"recommended\"."
+  ],
+  "extends": ["config:recommended", ":dependencyDashboard", ":semanticCommitsDisabled"],
+  "labels": ["renovate"],
+  "commitMessagePrefix": "chore:",
+  "commitMessageAction": "update",
+  "nix": { "enabled": true },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "commitMessageAction": "refresh",
+    "commitMessageTopic": "the flake lock"
+  },
+  "packageRules": [
+    {
+      "description": "Low-risk: label patch/minor/digest bumps",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "addLabels": ["update/minor-patch"]
+    },
+    {
+      "description": "Majors are reviewed one at a time",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["update/major", "review-carefully"]
+    },
+    {
+      "description": "The CI image tag is bumped by hand together with the nix-store volume name in .forgejo/workflows/check.yml (homelab/docs/ci.md)",
+      "matchPackageNames": ["192.168.0.200:30130/zettlrobert/ci-nix"],
+      "enabled": false
+    }
+  ],
+  "prConcurrentLimit": 8,
+  "prHourlyLimit": 0
+}
