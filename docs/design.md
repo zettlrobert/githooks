@@ -67,8 +67,9 @@ configs/taplo.toml
 tests/run.sh, tests/commit-msg/  # fixture tests for the two scripts plus config drift checks (63 checks)
 .forgejo/workflows/check.yml     # CI: just check and just lint on every PR and push to main
 renovate.json                    # Renovate: weekly flake.lock refresh (the tool bump) and the workflow actions
+docs/*.md                        # one doc per topic, see the docs outline below
 docs/design.md                   # this file
-README.md                        # the project README, see outline below
+README.md                        # overview, quickstart, links to docs/
 ```
 
 Installed as `$out/bin/*` (lefthook, every linter, `githooks-install`) and `$out/share/githooks/` (configs,
@@ -194,23 +195,22 @@ pre-push:
 
 Both scripts print the rule that failed and an example of a valid value.
 
-## README outline
+## Docs outline
 
-The README is the manual usage guide and the front page. Sections, in this order: what it is and why (three
-sentences, no history); lefthook in a nutshell for readers who have never used it (a runner, not a linter:
-`lefthook.yml` lists hooks and jobs, a job is a command plus a `glob`, `lefthook install` writes stubs into
-`.git/hooks`, jobs run in parallel on the staged files, `stage_fixed` re-adds formatted files, `extends`
-merges the shared base, `lefthook run pre-commit --all-files` by hand, `LEFTHOOK=0 git commit` skips once);
-install in a flake repo and in a repo without a flake (the exact lines, copy-paste
-ready); what runs on commit (the job table above, with fix/check), what `just lint` and CI run; the
-conventions with one valid and one invalid example each, the meaning of `junk` and `stash`, and which git
-commands never run the hook (revert and cherry-pick without an editor, stash, server-side commits);
-how linter rules are configured (every config file lives in the package next to the job that references
-it; a repo with its own rules writes its own job instead of extending the shared one); opt-in
-biome and per-repo jobs; bump the tools and rules; troubleshooting (hook not running, `Can't find lefthook`,
-`.githooks` dangling, stubs stale after a bump, GUI git); development (`just test`, `nix flake check`, layout);
-link to `docs/design.md`. Moving the source to the Forgejo instance later is one documented line
-(`git+https://forgejo.<domain>/zettlrobert/githooks?ref=main`).
+The README is the front page: what it is (three sentences), how it works (five bullets on lefthook and the
+`.githooks` link), a copy-paste quickstart for a flake repo, and a table linking one doc per topic. The topic docs
+are the manual usage guide:
+
+| Doc | Covers |
+|---|---|
+| `adopt-a-repo.md` | flake and non-flake repos, the `just lint` recipe, CI, repo-specific jobs |
+| `where-it-runs.md` | repo dev shell, NixOS host (`lib.mkGithooks`), nix profile; which version runs |
+| `what-runs.md` | the job table with fix/check, the two hooks, the commands, the package contents |
+| `conventions.md` | each rule with one valid and one invalid example, `junk` and `stash`, what never runs the hook |
+| `configure.md` | repo override files, replacing a job by name, opt-in jobs, editor and terminal setup |
+| `update.md` | each pin and its command, this repo's Renovate PRs, the biome migration |
+| `troubleshooting.md` | symptom and fix table |
+| `development.md` | recipes, layout, CI |
 
 ## Verification
 
